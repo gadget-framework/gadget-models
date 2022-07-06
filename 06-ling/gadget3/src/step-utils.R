@@ -1,95 +1,3 @@
-init_abund <- function(imm,
-                       mat,
-                       comp_id = 'species',
-                       mature = TRUE,
-                       init_mode = 1,
-                       bound_param = TRUE){
-  
-  stock <- if (mature) mat else imm
-  
-  ## Some defaults
-  minage <- 0
-  p_age <- 1
-  
-  ## MODE 0: initialised at equilibrium (using carrying capacity B0) assuming constant natual M (M)
-  if (init_mode == 0){
-    
-    init <- 1
-    m_table <- g3_stock_param(stock, comp_id, 'M', bound_param = FALSE)
-    prop_mat0 <- g3_stock_param(stock, comp_id, 'prop_mat0', bound_param)
-    
-    if(!mature){
-      prop_mat0 <- gadget3:::f_substitute(~1-prop_mat0, list(prop_mat0 = prop_mat0))
-    }
-    
-    ## Equilibrium age distribution
-    init_scalar <- gadget3:::f_substitute(
-      ~p0 * B0 * (1-exp(-1*M))/(1-exp(-1*maxage*M)),
-      list(p0 = prop_mat0,
-           B0 = g3_stock_param(stock, comp_id, 'B0', bound_param),
-           M = m_table,
-           maxage = gadget3:::g3_step(~stock_with(mat, mat__minage)))
-    )
-  }else{
-    
-    ## MODE 1: Initial parameter per age group (across stocks)  
-    if (init_mode == 1){
-      
-      init <- g3_stock_table(list(imm, mat), comp_id, 'initv', bound_param)
-      init_scalar <- g3_stock_param(stock, comp_id, 'init_scalar', bound_param)
-      m_table <- g3_stock_table(list(imm, mat), comp_id, 'M', bound_param = FALSE)
-      
-      ## Minimum age taken from immature stock
-      minage <- gadget3:::g3_step(~stock_with(imm, imm__minage))
-      
-      ## Proportion mature at age
-      p_age <- 
-        gadget3:::g3a_initial_ageprop(g3_stock_param(imm,
-                                                    comp_id,
-                                                    'mat_initial_alpha',
-                                                    bound_param),
-                                      g3_stock_param(imm,
-                                                    comp_id, 
-                                                    'mat_initial_a50',
-                                                    bound_param))
-      
-      ## Invert for immature stock
-      if(!mature){
-        p_age <- gadget3:::f_substitute(~1-p_age, list(p_age = p_age))
-      }
-      
-    }
-    else{
-      
-      ## MODE 2: Initial parameter per age group per stock
-      init <- g3_stock_table(stock, 'full', 'initv', bound_param)
-      init_scalar <- g3_stock_param(stock, 'full', 'init_scalar', bound_param)
-      m_table <- g3_stock_table(stock, 'full', 'M', bound_param = FALSE)
-      
-    }
-  }
-  
-  ## Get the initial abundance
-  gadget3:::g3a_initial_abund(
-    scalar = init_scalar,
-    init = init,
-    M = m_table,
-    init_F = g3_stock_param(stock, comp_id, 'init.F', bound_param),
-    minage = minage,
-    p_age = p_age)
-  
-}
-
-## Von Bertalanffy for initial conditions
-init_vonb <- function(stock, id = 'species', bound_param = TRUE){
-  
-  gadget3:::g3a_initial_vonb(
-    recl = g3_stock_param(stock, id, 'recl', bound_param), 
-    Linf = g3_stock_param(stock, id, 'Linf', bound_param),
-    K = g3_stock_param(stock, id, 'K', bound_param))
-  
-}
-
 stock_renewal <- function(stock, id = 'species', bound_param = TRUE){
   
   gadget3:::f_substitute(~scalar * renew,
@@ -118,7 +26,7 @@ model_actions <- function(imm, mat, mature = TRUE,
                                       # NB: area & age factor together (gadget2 just multiplied them)
                                       # initial abundance at age is 1e4 * q
                                       factor_f =
-                                        init_abund(imm, mat, comp_id, mature, init_mode, bound_param),
+                                        gadgetutils::init_abund(imm, mat, comp_id, mature, init_mode, bound_param),
                                       mean_f = init_vonb(stock),
                                       #stddev_f = bounded_table(stock, 'init.sd', list('init.sd' = list(lower = NULL, upper = NULL))),
                                       stddev_f =
