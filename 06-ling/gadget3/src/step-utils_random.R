@@ -28,15 +28,8 @@ model_actions <- function(imm, mat, mature = TRUE,
                                       # initial abundance at age is 1e4 * q
                                       factor_f =
                                         gadgetutils::init_abund(imm, mat, comp_id, mature, init_mode, bound_param),
-                                      mean_f = init_vonb(stock, 'species', bound_param),
-                                      stddev_f = g3_stock_table(stock, 'full', 'init.sd', bound_param = FALSE),
-                                      # stddev_f =
-                                      #    gadget3:::g3a_initial_sigma(
-                                      #      g3_stock_param(stock, comp_id, 'initial_sigma_alpha', bound_param),
-                                      #      g3_stock_param(stock, comp_id, 'initial_sigma_beta', bound_param),
-                                      #      g3_stock_param(stock, comp_id, 'initial_sigma_gamma', bound_param),
-                                      #      init_vonb(stock, 'species', bound_param)
-                                      # ),
+                                      mean_f = init_vonb(stock, comp_id, bound_param),
+                                      stddev_f = gadgetutils::init_sd(stock, comp_id, parametric = FALSE, bound_param = FALSE),
                                       alpha_f = g3_stock_param(stock, comp_id, 'walpha', bound_param),
                                       beta_f = g3_stock_param(stock, comp_id, 'wbeta', bound_param)),
     

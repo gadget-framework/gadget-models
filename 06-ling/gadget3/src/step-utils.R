@@ -28,14 +28,7 @@ model_actions <- function(imm, mat, mature = TRUE,
                                       factor_f =
                                         gadgetutils::init_abund(imm, mat, comp_id, mature, init_mode, bound_param),
                                       mean_f = init_vonb(stock),
-                                      #stddev_f = bounded_table(stock, 'init.sd', list('init.sd' = list(lower = NULL, upper = NULL))),
-                                      stddev_f =
-                                        gadget3:::g3a_initial_sigma(
-                                          g3_stock_param(stock, comp_id, 'initial_sigma_alpha', bound_param = FALSE),
-                                          g3_stock_param(stock, comp_id, 'initial_sigma_beta', bound_param = FALSE),
-                                          g3_stock_param(stock, comp_id, 'initial_sigma_gamma', bound_param = FALSE),
-                                          init_vonb(stock)
-                                      ),
+                                      stddev_f = gadgetutils::init_sd(stock, comp_id),
                                       alpha_f = g3_stock_param(stock, comp_id, 'walpha', bound_param = FALSE),
                                       beta_f = g3_stock_param(stock, comp_id, 'wbeta', bound_param = FALSE)),
     
