@@ -1,0 +1,19 @@
+[component]
+type            predatorpreyprinter
+predatornames   rinimm  rinmat
+preynames       venimm venmat
+areaaggfile     Aggfiles/catchdistribution.ldist.ven.aco.area.agg
+ageaggfile      Aggfiles/catchdistribution.alk.ven.aco.age.agg
+lenaggfile      Aggfiles/surveyindices.si.ven.cpue.len.agg
+printfile       WGTS/print.aggfiles/ven_mort_age
+yearsandsteps   all all
+;
+[component]
+type            predatorpreyprinter
+predatornames   comven1  comven2
+preynames       venimm venmat
+areaaggfile     Aggfiles/catchdistribution.ldist.ven.aco.area.agg
+ageaggfile      Aggfiles/catchdistribution.alk.ven.aco.age.agg
+lenaggfile      Aggfiles/surveyindices.si.ven.cpue.len.agg
+printfile       WGTS/print.aggfiles/ven_f_age
+yearsandsteps   all all
