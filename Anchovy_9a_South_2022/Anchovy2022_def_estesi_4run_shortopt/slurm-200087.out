@@ -1,0 +1,70 @@
+slurmstepd: info: Setting TMPDIR to /scratch/200087. Previous errors about TMPDIR can be discarded
+gadget/2.3.5 loaded
+> #devtools::install_github('hafro/rgadget')
+> library(Rgadget)
+Loading required package: tidyverse
+── Attaching packages ─────────────────────────────────────── tidyverse 1.3.0 ──
+✔ ggplot2 3.3.6     ✔ purrr   0.3.4
+✔ tibble  3.1.7     ✔ dplyr   1.0.9
+✔ tidyr   1.2.0     ✔ stringr 1.4.0
+✔ readr   2.1.2     ✔ forcats 0.5.1
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+> tmp<-callGadget(s=1,main='main',i='params.in',o='lik.out',ignore.stderr=FALSE, log='tmp')
+Warning in area - temperature data doesnt span time range
+Warning in surveyindex - differing timesteps for pelagonumber.survey
+Warning in surveyindex - differing timesteps for ecocadiz.survey
+Warning in keeper - failed to match switch constant
+Warning in keeper - failed to match switch l50
+Warning in keeper - failed to match switch constantecorec
+Warning in keeper - failed to match switch l50ecorec
+Warning in keeper - failed to match switch constantarsa
+Warning in keeper - failed to match switch l50arsa
+Warning in growth calculation - length greater than length infinity
+> lik <- read.gadget.likelihood('likelihood')
+Warning messages:
+1: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+2: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+3: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+4: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+5: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+6: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+7: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+8: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+9: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+10: In if (class(tmp) != "list") { :
+  la condición tiene longitud > 1 y sólo el primer elemento será usado
+> tmp<-gadget.iterative(params.file = 'params.in',
++                       optinfofile = 'optfile',
++                       wgts = 'WGTS',
++                       rew.sI=TRUE,
++                       cv.floor=0.05,
++                       grouping = list(sind=lik$surveyindices$name, seine = c('ldist.seine','ldist.alkseine')))
+[1] "Running ldist.seine.ldist.alkseine"
+[1] "Running pelagonumber.survey.ecocadiz.survey"
+[1] "Running aldist.ecocadiz"
+[1] "Running aldist.pelago"
+[1] "Running ldist.ecocadiz.noage"
+[1] "Running ldist.pelago.noage"
+[1] "Comp pelagonumber.survey.ecocadiz.survey completed"
+[1] "Comp aldist.pelago completed"
+[1] "Comp ldist.seine.ldist.alkseine completed"
+[1] "Comp aldist.ecocadiz completed"
+[1] "Comp ldist.pelago.noage completed"
+Joining by: comp
+Error in if (sum(weights$sigmahat == 0) > 0) { : 
+  valor ausente donde TRUE/FALSE es necesario
+Calls: gadget.iterative -> write.files
+Además: There were 11 warnings (use warnings() to see them)
+Ejecución interrumpida
+slurmstepd: error: Detected 1 oom-kill event(s) in StepId=200087.batch. Some of your processes may have been killed by the cgroup out-of-memory handler.
