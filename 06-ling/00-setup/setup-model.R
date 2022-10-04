@@ -3,7 +3,7 @@
 ## weight length relationship
 lw.constants <- 
   mfdb_dplyr_sample(mdb) %>% 
-  filter(species == defaults$species,
+  filter(species == local(defaults$species),
          sampling_type == 'IGFS',
          !is.na(weight)) %>% 
   select(length,weight) %>% 
@@ -17,7 +17,7 @@ lw.constants$estimate[1] <- exp(lw.constants$estimate[1])
 ## initial conditions sigma
 init.sigma <- 
   mfdb_dplyr_sample(mdb) %>% 
-  dplyr::filter(species == defaults$species,age >0,!is.na(length))  %>% 
+  dplyr::filter(species == local(defaults$species),age >0,!is.na(length))  %>% 
   dplyr::select(age,length) %>% 
   dplyr::collect(n=Inf) %>% 
   dplyr::group_by(age) %>% 
@@ -26,7 +26,7 @@ init.sigma <-
 ## initial guess for the maturity ogive:
 mat.l50 <- 
   mfdb_dplyr_sample(mdb) %>% 
-  filter(species == defaults$species,
+  filter(species == local(defaults$species),
          sampling_type == 'IGFS',
          !is.na(maturity_stage)) %>% 
   select(length,maturity_stage) %>% 
@@ -57,7 +57,7 @@ ling.imm <-
                                    beta = '#lingimm.wbeta'),
                 beta = to.gadget.formulae(quote(10*ling.bbin))) %>% 
   gadget_update('initialconditions',
-                normalparam = data_frame(age = .[[1]]$minage:.[[1]]$maxage,
+                normalparam = tibble(age = .[[1]]$minage:.[[1]]$maxage,
                                          area = 1,
                                          age.factor = parse(text=sprintf('exp(-1*(lingimm.M+ling.init.F)*%1$s)*lingimm.init.%1$s',age)) %>% 
                                            map(to.gadget.formulae) %>% 

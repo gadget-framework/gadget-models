@@ -5,8 +5,8 @@ source('R/utils.R')
 bootstrap <- FALSE
 ## Create a gadget directory, define some defaults to use with our queries below
 gd <- gadget_directory("06-ling/12-new_ass")
-mdb<-mfdb('Iceland',db_params=list(host='hafgeimur.hafro.is'))
-  vers <- c('12-new_ass', '02-growth_rest')[2]
+mdb<-mfdb('Iceland',db_params=list(host='mfdb.hafro.is'))
+vers <- c('12-new_ass', '02-growth_rest')[1]
   year_range <- 1982:2018
 base_dir <- '06-ling'
 mat_stock <- 'lingmat'
@@ -15,7 +15,7 @@ stock_names <- c(imm_stock,mat_stock)
 species_name <- 'ling'
 ## Create a gadget directory, define some defaults to use with our queries below
 gd <- gadget_directory(sprintf(paste0("%s/",vers),base_dir))
-mdb<-mfdb('Iceland')#,db_params=list(host='hafgeimur.hafro.is'))
+#mdb<-mfdb('Iceland')#,db_params=list(host='hafgeimur.hafro.is'))
 
 reitmapping <- 
   read.table(
@@ -29,6 +29,11 @@ defaults <- list(
     year = year_range,
     species = 'LIN')
 
+schedule <- 
+  expand_grid(year = defaults$year,
+              step = defaults$timestep %>% names() %>% as.numeric()) %>% 
+  arrange(year,step)
+
 
 gadgetfile('Modelfiles/time',
            file_type = 'time',
@@ -40,10 +45,13 @@ gadgetfile('Modelfiles/time',
   write.gadget.file(gd$dir)
 
 ## Write out areafile and update mainfile with areafile location
-gadget_areafile(
-  size = mfdb_area_size(mdb, defaults)[[1]],
-  temperature = mfdb_temperature(mdb, defaults)[[1]]) %>% 
-gadget_dir_write(gd,.)
+gadgetfile('Modelfiles/area',
+           file_type = 'area',
+           components = list(list(areas = 1,
+                                  size = 1,
+                                  temperature = schedule %>% mutate(area = 1, temperature = 5)))) %>% 
+  write.gadget.file(gd$dir)
+
 
 source('R/utils.R')
 source('06-ling/00-setup/setup-fleets.R')

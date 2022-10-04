@@ -226,12 +226,16 @@ print(names(attributes(result)))
 
 if (!run_iterative){
   
+  options(warn=2)
+  options(error=recover) 
+  
   # Compile and generate TMB ADFun (see ?TMB::MakeADFun)
   obj.fun <- g3_tmb_adfun(tmb_model,tmb_param)
   # writeLines(TMB::gdbsource(g3_tmb_adfun(tmb_model, tmb_param, compile_flags = "-g", output_script = TRUE)))
   
   # Run model once, using g3_tmb_par to reshape tmb_param into param vector.
   # Will return nll
+  
   obj.fun$fn(g3_tmb_par(tmb_param))
   
   # Run model once, returning model report

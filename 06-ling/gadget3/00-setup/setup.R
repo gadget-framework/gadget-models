@@ -7,14 +7,10 @@
 library(mfdb)
 library(tidyverse)
 library(gadget3)
-#library(Rgadget)
+library(gadgetplots)
+library(gadgetutils)
 
 base_dir <- '06-ling/gadget3'
-source(file.path(base_dir, 'src/stock_param_functions.R'))
-source(file.path(base_dir, 'src/step-utils.R'))
-source(file.path(base_dir, 'src/gadget_iterative.R'))
-source(file.path(base_dir, 'src/g3_init_guess.R'))
-source(file.path(base_dir, 'src/g3_jitter.R'))
 
 ## -----------------------------------------------------------------------------
 ## OPTIONS 
@@ -24,18 +20,9 @@ source(file.path(base_dir, 'src/g3_jitter.R'))
 read_data <- FALSE
 
 ## Whether or not to run iterative reweighting
-run_iterative <- TRUE
-
-## Optimisation mode (param_opt_mode), options: 
-# (1) parameters are bounded internally (ie using the bounded function) works with 'BFGS' optim method
-# (2) parameters are bounded externally so the optim function must use a box-constrained optimisation method
-# (3) global search, all parameters unbounded, unconstrained optimisation can be used (eg 'BFGS')
-
-setup_options <- list(param_opt_mode = 1,
-                      initial_abund_mode = 2)
-
-## Whether or not to bound parameters internally
-setup_options$bound_params <- ifelse(setup_options$param_opt_mode == 1, TRUE, FALSE)
+run_iterative <- FALSE
+run_retro <- FALSE
+bootstrap <- FALSE
 
 ## -----------------------------------------------------------------------------
 ## PARAMETERS 
@@ -71,7 +58,7 @@ areas <- structure(
 time_actions <- list(
   g3a_time(start_year = min(defaults$year),
            end_year = max(defaults$year),
-           project_years = 0L,
+#           project_years = 0L,
            defaults$timestep),
   list())
 
@@ -82,6 +69,7 @@ fs::dir_create(file.path(base_dir, c('data', 'model')))
 ## ------------------------------------------------------------------------------------
 
 source(file.path(base_dir, '00-setup', 'setup-model.R'))  # Generates mat_stock_actions / imm_stock_actions
+source(file.path(base_dir, '00-setup', 'setup-model_components.R'))  # Generates mat_stock_actions / imm_stock_actions
 
 if(read_data){
   mdb <- mfdb('Iceland', db_params = list(host = 'mfdb.hafro.is'))
@@ -99,16 +87,28 @@ if(read_data){
 ##### Configure model actions #################################################
 
 source(file.path(base_dir, '00-setup', 'setup-fleets.R'))  # Generates fleet_actions
-if (!run_iterative){ 
-  source(file.path(base_dir, '00-setup', 'setup-likelihood_alphabeta.R')) # Generates likelihood_actions (alpha and beta optimized)
-}else{ 
-  source(file.path(base_dir, '00-setup', 'setup-likelihood.R')) # Generates likelihood_actions (alpha and beta estimated by lm)
-}
+source(file.path(base_dir, '00-setup', 'setup-likelihood.R')) # Generates likelihood_actions (alpha and beta estimated by lm)
+source(file.path(base_dir, '00-setup', 'setup-randomeffects.R')) # Generates likelihood_actions (alpha and beta estimated by lm)
+
+
+## Stock actions
+stock_actions <- c(initial_conditions_imm,
+                   natural_mortality_imm,
+                   ageing_imm,
+                   renewal_imm,
+                   growmature_imm,
+                   list(),
+                   initial_conditions_mat,
+                   natural_mortality_mat,
+                   ageing_mat,
+                   growmature_mat,
+                   random_actions,
+                   #spawning,
+                   list())
 
 ## Collate actions
 actions <- c(
-  mat_actions,
-  imm_actions,
+  stock_actions,
   fleet_actions,
   likelihood_actions,
   time_actions)
@@ -133,54 +133,51 @@ tmb_param <- attr(tmb_model, 'parameter_template')
 # Fill in the parameter template
 tmb_param <- 
   tmb_param %>% 
-  g3_init_guess('\\.recv', 1, 0.001, 1000, 1) %>% 
-  g3_init_guess('\\.init', 1, 0.001, 1000, 1) %>% 
-  g3_init_guess('recl', 12, 1, 20, 1) %>% 
-  g3_init_guess('rec_sd', 1, 1, 20, 1) %>% 
-  g3_init_guess('rec_scalar', 2, 1, 100, 1) %>% 
-  g3_init_guess('init_scalar', 2, 1, 100, 1) %>% 
-  g3_init_guess('Linf', 150, 150, 200, 1) %>% 
-  g3_init_guess('\\.K', 90, 40, 120, 1) %>% 
+  g3_init_guess('\\.rec', 50, 0.001, 120, 0) %>% 
+  g3_init_guess('\\.init', 50, 0.001, 120, 1) %>% 
+  g3_init_guess('recl', 4.5, 4, 10, 1) %>% 
+  g3_init_guess('rec.sd', 5, 4, 20, 1) %>% 
+  g3_init_guess('rec.scalar', 250, 1, 500, 1) %>% 
+  g3_init_guess('init.scalar', 150, 1, 300, 1) %>% 
+  g3_init_guess('Linf', 110, 100, 120, 1) %>% 
+  g3_init_guess('\\.K', 70, 60, 80, 1) %>% 
   g3_init_guess('bbin', 6, 1e-08, 100, 1) %>% 
   g3_init_guess('\\.alpha', 0.5, 0.01, 1, 1) %>% 
-  g3_init_guess('l50', 50, 20, 100, 1) %>% 
-  g3_init_guess('init.F', 0.4, 0.2, 0.8, 1) %>% 
+  g3_init_guess('l50', 50, 10, 100, 1) %>% 
+  g3_init_guess('init.F', 0.4, 0.1, 1, 1) %>% 
   g3_init_guess('\\.M', 0.15, 0.001, 1, 0) %>% 
+  #    g3_init_guess('mat_initial_alpha', 1, 0.5, 2, 1) %>% 
+  #    g3_init_guess('mat_initial_a50', mat.a50$a50, 1, 18, 0) %>% 
   g3_init_guess('prop_mat0', 0.5, 0.1, 0.9, 0) %>%
   g3_init_guess('B0', 100, 1, 5000, 1) %>%
-  g3_init_guess('mat1', 0, 10, 200, 1) %>% 
-  g3_init_guess('mat2', 21, 20, 120, 1) %>% #mat.l50$l50, 0.75*mat.l50$l50, 1.25*mat.l50$l50, 1) %>%
+  g3_init_guess('mat_alpha', 70, 10, 200, 1) %>% 
+  g3_init_guess('mat_l50', mat.l50$l50, 0.75*mat.l50$l50, 1.25*mat.l50$l50, 1) %>% 
   g3_init_guess('sigma_alpha', init.sigma.coef[['alpha']], -1, 1, 0) %>%
   g3_init_guess('sigma_beta', init.sigma.coef[['beta']], 0, 2, 0) %>%
   g3_init_guess('sigma_gamma', init.sigma.coef[['gamma']], 0, 1, 0) %>%
   g3_init_guess('walpha', lw.constants$estimate[1], 1e-10, 1, 0) %>% 
   g3_init_guess('wbeta', lw.constants$estimate[2], 2, 4, 0) 
 
-
-
-## Old weights from gadget2
-if (!run_iterative){
+## Initial sd's
+if (any(grepl('\\.init\\.sd', tmb_param$switch))){
   
-  tmb_param$value['cdist_sumofsquares_ldist_lln_weight'] <- 3331
-  tmb_param$value['cdist_sumofsquares_aldist_lln_weight'] <- 2512
-  tmb_param$value['cdist_sumofsquares_ldist_bmt_weight'] <- 1247
-  tmb_param$value['cdist_sumofsquares_aldist_bmt_weight'] <- 1515
-  tmb_param$value['cdist_sumofsquares_ldist_gil_weight'] <- 781
-  tmb_param$value['cdist_sumofsquares_aldist_gil_weight'] <- 719
-  tmb_param$value['cdist_sumofsquares_ldist_igfs_weight'] <- 6869
-  tmb_param$value['cdist_sumofsquares_aldist_igfs_weight'] <- 11087
-  tmb_param$value['cdist_sumofsquares_matp_igfs_weight'] <- 9
-  tmb_param$value['adist_surveyindices_log_si_igfs_si1_weight'] <- 40
-  tmb_param$value['adist_surveyindices_log_si_igfs_si2a_weight'] <- 8
-  tmb_param$value['adist_surveyindices_log_si_igfs_si2b_weight'] <- 36
-  tmb_param$value['adist_surveyindices_log_si_igfs_si3a_weight'] <- 19
-  tmb_param$value['adist_surveyindices_log_si_igfs_si3b_weight'] <- 16
-  tmb_param$value['adist_surveyindices_log_si_igfs_si3c_weight'] <- 13
-  tmb_param$value['adist_surveyindices_log_si_igfs_si3d_weight'] <- 14.5
+  tmb_param[grepl('mat\\.init\\.sd', tmb_param$switch), 'value'] <-
+    init.sigma %>% filter(age %in% 
+                            gadget3:::stock_definition(mat_stock, 'stock__minage'): 
+                            gadget3:::stock_definition(mat_stock, 'stock__maxage')) %>% .$ms
+  
+  tmb_param[grepl('imm\\.init\\.sd', tmb_param$switch), 'value'] <-
+    init.sigma %>% filter(age %in% 
+                            gadget3:::stock_definition(imm_stock, 'stock__minage'): 
+                            gadget3:::stock_definition(imm_stock, 'stock__maxage')) %>% .$ms
+  ## Turn off optimisation
+  tmb_param <-
+    tmb_param %>% 
+    mutate(optimise = case_when(grepl('init.sd', switch) ~ FALSE,
+                                grepl('.M.[\\.[0-9]', switch) ~ FALSE,
+                                TRUE~optimise))
   
 }
-
-## -----------------------------------------------------------------------------
 
 
 ## Run the R-model
@@ -190,83 +187,25 @@ result[[1]]
 # List all available reports
 print(names(attributes(result)))
 
-## -----------------------------------------------------------------------------
+# Compile and generate TMB ADFun (see ?TMB::MakeADFun)
+obj.fun <- g3_tmb_adfun(tmb_model,tmb_param)
 
-if (!run_iterative){
+# Run model once, using g3_tmb_par to reshape tmb_param into param vector.
+# Will return nll
+obj.fun$fn(g3_tmb_par(tmb_param))
   
-  # Compile and generate TMB ADFun (see ?TMB::MakeADFun)
-  obj.fun <- g3_tmb_adfun(tmb_model,tmb_param)
-  # writeLines(TMB::gdbsource(g3_tmb_adfun(tmb_model, tmb_param, compile_flags = "-g", output_script = TRUE)))
+# Run model once, returning model report
+obj.fun$report(g3_tmb_par(tmb_param))
   
-  # Run model once, using g3_tmb_par to reshape tmb_param into param vector.
-  # Will return nll
-  obj.fun$fn(g3_tmb_par(tmb_param))
+# Run model through R optimiser, using bounds set in tmb_param
+fit.opt <- optim(g3_tmb_par(tmb_param),
+                 obj.fun$fn,
+                 obj.fun$gr,
+                 method = 'BFGS',
+                 control = list(trace = 2,
+                                maxit = 1000, 
+                                reltol = .Machine$double.eps^2,
+                                parscale = g3_tmb_parscale(tmb_param)))
   
-  # Run model once, returning model report
-  obj.fun$report(g3_tmb_par(tmb_param))
+fit <- gadget3:::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
   
-  # Run model through R optimiser, using bounds set in tmb_param
-  fit.opt <- optim(g3_tmb_par(tmb_param),
-                   obj.fun$fn,
-                   obj.fun$gr,
-                   method = 'BFGS',
-                   control = list(trace = 2,maxit = 1000, reltol = .Machine$double.eps^2))
-  
-  fit <- gadget3:::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
-  
-  fit$stock.std %>% filter(year == 1982, step == 1) %>% group_by(age) %>% 
-    ggplot(aes(x = age, y = number, fill = stock)) + geom_bar(stat = "identity", position = "dodge")
-  
-}else{
-  # Compile and generate TMB ADFun (see ?TMB::MakeADFun)
-  obj.fun <- g3_tmb_adfun(tmb_model,tmb_param)
-  ## Iterative re-weighting
-  res1 <-  g3_lik_out(model, tmb_param) 
-  #res2 <-  g3_iterative_setup(res1)
-  res2 <-  g3_iterative_setup(res1, grouping = list(si1 = c('log_si_igfs_si1',
-                                                            'log_si_igfs_si2a',
-                                                            'log_si_igfs_si2b'),
-                                                    si2 = c('log_si_igfs_si3a',
-                                                            'log_si_igfs_si3b',
-                                                            'log_si_igfs_si3c',
-                                                            'log_si_igfs_si3d'),
-                                                    comm= c('ldist_gil','ldist_bmt',
-                                                           'aldist_gil','aldist_bmt'))
-                              )
-  
-  res3 <-  parallel::mclapply(res2, function(x) g3_iterative_run(x, tmb_model), mc.cores = parallel::detectCores())
-  res4 <-  parallel::mclapply(res3, function(x) g3_lik_out(model,x), mc.cores = parallel::detectCores())
-  res5 <-  g3_iterative_final(res4, jitter_params = FALSE)
-  res6 <-  parallel::mclapply(res5, function(x) g3_iterative_run(x, tmb_model), mc.cores = parallel::detectCores())
-  res7 <-  parallel::mclapply(res6, function(x) g3_lik_out(model,x), mc.cores = parallel::detectCores())
-  res8 <-  g3_iterative_final(res7)
-
-  names(res2) %>%
-    set_names(.,.) %>%
-    map(function(x) {
-      res7[[x]] %>%
-        left_join(res6[[x]] %>%
-                    select(comp = switch,weight=value) %>%
-                    mutate(comp = gsub('_weight','',comp),
-                           weight = unlist(weight)))
-    })-> out
-
-  names(res2) %>%
-    set_names(.,.) %>%
-    map(function(x) {
-      res4[[x]] %>%
-        left_join(res3[[x]] %>%
-                    select(comp = switch,weight=value) %>%
-                    mutate(comp = gsub('_weight','',comp),
-                           weight = unlist(weight)))
-    })-> out2
-
-
-  out %>% bind_rows(.id='group') %>% group_by(group) %>% summarise(s=sum(value*weight))
-  out2 %>% bind_rows(.id='group') %>% group_by(group) %>% summarise(s=sum(value*weight))
-  
- # fit <- gadget3:::g3_fit(model, res6$mat_igfs$value)
-  
-  
-}
-
