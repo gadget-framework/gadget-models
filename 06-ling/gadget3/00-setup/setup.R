@@ -68,7 +68,7 @@ fs::dir_create(file.path(base_dir, c('data', 'model')))
 
 ## ------------------------------------------------------------------------------------
 
-source(file.path(base_dir, '00-setup', 'setup-model.R'))  # Generates mat_stock_actions / imm_stock_actions
+source(file.path(base_dir, '00-setup', 'setup-model_tagging.R'))  # Generates mat_stock_actions / imm_stock_actions
 source(file.path(base_dir, '00-setup', 'setup-model_components.R'))  # Generates mat_stock_actions / imm_stock_actions
 
 if(read_data){
@@ -87,6 +87,8 @@ if(read_data){
 ##### Configure model actions #################################################
 
 source(file.path(base_dir, '00-setup', 'setup-fleets.R'))  # Generates fleet_actions
+source(file.path(base_dir, '00-setup', 'setup-fleets_prognosis.R'))  # Generates fleet_actions
+source(file.path(base_dir, '00-setup', 'setup-tagging.R'))  # Generates fleet_actions
 source(file.path(base_dir, '00-setup', 'setup-likelihood.R')) # Generates likelihood_actions (alpha and beta estimated by lm)
 source(file.path(base_dir, '00-setup', 'setup-randomeffects.R')) # Generates likelihood_actions (alpha and beta estimated by lm)
 
@@ -102,7 +104,7 @@ stock_actions <- c(initial_conditions_imm,
                    natural_mortality_mat,
                    ageing_mat,
                    growmature_mat,
-                   random_actions,
+                   #random_actions3,
                    #spawning,
                    list())
 
@@ -110,8 +112,12 @@ stock_actions <- c(initial_conditions_imm,
 actions <- c(
   stock_actions,
   fleet_actions,
+  tagging_actions,
   likelihood_actions,
   time_actions)
+
+actions <- c(actions, list(
+  g3a_report_history(actions, '^ling_(imm|mat)__(num|wgt|igfs|lln|bmt|gil|foreign|suit_igfs|renewalnum|renewalwgt)$')))
 
 ##### Compile the r- and tmb-based models ######################################
 
@@ -133,13 +139,13 @@ tmb_param <- attr(tmb_model, 'parameter_template')
 # Fill in the parameter template
 tmb_param <- 
   tmb_param %>% 
-  g3_init_guess('\\.rec', 50, 0.001, 120, 0) %>% 
+  g3_init_guess('\\.rec', 50, 0.001, 120, 1) %>% 
   g3_init_guess('\\.init', 50, 0.001, 120, 1) %>% 
   g3_init_guess('recl', 4.5, 4, 10, 1) %>% 
   g3_init_guess('rec.sd', 5, 4, 20, 1) %>% 
   g3_init_guess('rec.scalar', 250, 1, 500, 1) %>% 
   g3_init_guess('init.scalar', 150, 1, 300, 1) %>% 
-  g3_init_guess('Linf', 110, 100, 120, 1) %>% 
+  g3_init_guess('Linf', 110, 100, 120, 0) %>% 
   g3_init_guess('\\.K', 70, 60, 80, 1) %>% 
   g3_init_guess('bbin', 6, 1e-08, 100, 1) %>% 
   g3_init_guess('\\.alpha', 0.5, 0.01, 1, 1) %>% 
@@ -184,6 +190,12 @@ if (any(grepl('\\.init\\.sd', tmb_param$switch))){
 result <- model(tmb_param$value)
 result[[1]]
 
+tmb_param$value$project_years <- 10
+tmb_param$value$tac.hr.high <- 0.25
+tmb_param$value$tac.trigger <- 9e6
+
+res <- model(tmb_param$value)
+
 # List all available reports
 print(names(attributes(result)))
 
@@ -198,14 +210,16 @@ obj.fun$fn(g3_tmb_par(tmb_param))
 obj.fun$report(g3_tmb_par(tmb_param))
   
 # Run model through R optimiser, using bounds set in tmb_param
-fit.opt <- optim(g3_tmb_par(tmb_param),
+fit.opt <- optim(g3_tmb_par(tmb_param, include_random = TRUE),
                  obj.fun$fn,
                  obj.fun$gr,
+                 lower = gadget3:::g3_tmb_bound(tmb_param, 'lower', include_random=T),
+                 upper = gadget3:::g3_tmb_bound(tmb_param, 'upper', include_random=T),
                  method = 'BFGS',
                  control = list(trace = 2,
-                                maxit = 1000, 
-                                reltol = .Machine$double.eps^2,
-                                parscale = g3_tmb_parscale(tmb_param)))
+                                maxit = 10, 
+                                reltol = .Machine$double.eps^2))
   
 fit <- gadget3:::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
   
+ 
