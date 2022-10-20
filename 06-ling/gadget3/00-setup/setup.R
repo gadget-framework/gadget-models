@@ -210,7 +210,7 @@ obj.fun$fn(g3_tmb_par(tmb_param))
 obj.fun$report(g3_tmb_par(tmb_param))
   
 # Run model through R optimiser, using bounds set in tmb_param
-fit.opt <- optim(g3_tmb_par(tmb_param, include_random = TRUE),
+fit.opt <- optim(obj.fun$par,
                  obj.fun$fn,
                  obj.fun$gr,
                  lower = gadget3:::g3_tmb_bound(tmb_param, 'lower', include_random=T),
