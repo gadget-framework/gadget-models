@@ -214,6 +214,6 @@ fit.opt <- optim(obj.fun$par,
                                 maxit = 10, 
                                 reltol = .Machine$double.eps^2))
   
-fit <- gadget3:::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
+fit <- gadgetutils::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
   
  

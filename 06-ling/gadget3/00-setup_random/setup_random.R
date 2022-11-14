@@ -255,7 +255,7 @@ if (!run_iterative){
                     method = 'BFGS',
                     control = list(trace = 2,maxit = 1000, reltol = .Machine$double.eps^2))
   
-  fit <- gadget3:::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
+  fit <- gadgetutils::g3_fit(model, g3_tmb_relist(tmb_param, fit.opt$par))
   
   fit$stock.std %>% filter(year == 1982, step == 1) %>% group_by(age) %>% 
     ggplot(aes(x = age, y = number, fill = stock)) + geom_bar(stat = "identity", position = "dodge")
@@ -280,7 +280,7 @@ if (!run_iterative){
                                               'aldist_gil','aldist_bmt')))
   
   ## Get the model fit
-  fit <- gadget3:::g3_fit(model, tmp$value)
+  fit <- gadgetutils::g3_fit(model, tmp$value)
   ## Save the model
   save(model, tmb_model, tmb_param, file = file.path(base_dir, "models", vers, "model.Rdata"))
   
@@ -334,7 +334,7 @@ if (!run_iterative){
   # out %>% bind_rows(.id='group') %>% group_by(group) %>% summarise(s=sum(value*weight))
   # out2 %>% bind_rows(.id='group') %>% group_by(group) %>% summarise(s=sum(value*weight))
   # 
-  # #fit <- gadget3:::g3_fit(model, res6$ldist_lln$value)
+  # #fit <- gadgetutils::g3_fit(model, res6$ldist_lln$value)
   
   
 
