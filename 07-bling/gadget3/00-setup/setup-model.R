@@ -1,15 +1,12 @@
 ## -----------------------------------------------------------------------------
 ##
-## Runner to set up stocks parameters and actions using g3 defaults as far as possible
+## Runner to set up parameters and actions for a single stock model using g3 defaults as far as possible
 ##
 ## -----------------------------------------------------------------------------
 
-## Setup formulas that depend on setup options
-
-## Two internal functions (from gadgetutils) that should not be made visible
-# (1) ogive for splitting ages between stocks
-g3a_initial_ageprop <- function(alpha = gadget3::g3_parameterized('mat_initial_alpha', by_stock = 'species'), 
-                                a50 = gadget3::g3_parameterized('mat_initial_a50', by_stock = 'species'),
+## Function to set up an maturity ogive (used for initial conditions)
+g3a_initial_ageprop <- function(alpha = gadget3::g3_parameterized('mat_initial_alpha', by_stock = by_stock), 
+                                a50 = gadget3::g3_parameterized('mat_initial_a50', by_stock = by_stock),
                                 by_stock = FALSE){  
   gadget3:::f_substitute(~bounded(-1 * alpha * (age - a50), 0, 1),
                          list(alpha = alpha, 
@@ -17,44 +14,35 @@ g3a_initial_ageprop <- function(alpha = gadget3::g3_parameterized('mat_initial_a
   )
 }
 
-## Parametric relationship for initial sd's
-g3a_initial_sigma <- function(alpha = gadget3::g3_parameterized('initial_sigma_alpha', by_stock = 'species'), 
-                              beta = gadget3::g3_parameterized('initial_sigma_beta', by_stock = 'species'), 
-                              gamma = gadget3::g3_parameterized('initial_sigma_gamma', by_stock = 'species'), 
-                              mean_l = gadget3::g3a_renewal_vonb_t0(),
-                              by_stock = FALSE){
-  
-  gadget3:::f_substitute(
-    ~mean_l * ( alpha + beta/age + gamma * age),
-    list(alpha = alpha,
-         beta = beta,
-         gamma = gamma,
-         mean_l = mean_l)
-  )
+## Some parameters are used in multiple actions and their configurations may depend
+#  upon options defined in the setup.R script, therefore it is easiest to define them here
+#  so they can be implemented across actions in a consistent manner
+
+## Growth coefficient - defining it here as we have an option to make this a time varying parameter in the setup
+vonb_K <- gadget3::g3_parameterized(name = 'K', by_year = timevarying_K, by_stock = stocks)
+
+## There are various ways to parameterize the initial conditions in the two stock model
+#  we consider two: (1) a single scalar that decays with age according to natural mortality and initial fishing mortality
+#                   (2) a single scalar that multiplies age-specific numbers that decay with natural and initial fishing mortality, numbers at age are split between stocks via an ogive
+#                   (3) a single scalar that multiplies age- and stock-specific numbers that decay with natural and initial fishing mortality
+# (1)
+if (!init_abund_by_age){
+  initabun <- gadget3::g3a_renewal_initabund(init = 1L, 
+                                             M = g3_parameterized('M', by_age = TRUE, by_stock = stocks),
+                                             proportion_f = g3a_initial_ageprop(by_stock = stocks),
+                                             by_stock = stocks)  
+}else{
+  # (2)
+  if (init_abund_by_age && !init_abund_by_stock){
+    initabun <- gadget3::g3a_renewal_initabund(by_stock = stocks,
+                                               M = g3_parameterized('M', by_age = TRUE, by_stock = stocks),
+                                               proportion_f = g3a_initial_ageprop(by_stock = stocks))  
+  }else{
+    # (3)
+    initabun <- gadget3::g3a_renewal_initabund(M = g3_parameterized('M', by_age = TRUE, by_stock = stocks))
+  }
 }
 
-
-
-initvonb <- 
-  gadget3::g3a_renewal_vonb_recl(K = g3_parameterized('K', 
-                                                    by_stock = stocks, 
-                                                    by_year = timevarying_K),
-                               by_stock = stocks,
-                               recage = 3)
-
-
-## Initial numbers
-# One parameter per age group per stock
-initabun <- gadget3::g3a_renewal_initabund(by_stock = TRUE, by_stock_f = stocks, recage = gadget3::g3_stock_def(imm_stock, 'minage'))
-
-# One parameter per age group across stocks
-if (initial_abund_mode == 2){
-  initabun <- gadget3::g3a_renewal_initabund(by_stock = stocks, proportion_f = g3a_initial_ageprop(), recage = gadget3::g3_stock_def(imm_stock, 'minage'))
-}
-
-## Initial sd's
-# One per age group per stock
-initsd <- gadget3::g3_parameterized('init.sd', by_stock = TRUE, by_age = TRUE)
 
 ## -----------------------------------------------------------------------------
 ## Setup model actions
@@ -66,39 +54,41 @@ imm_actions <-
   list(
     
     ## INITIAL CONDITIONS
-    g3a_initialconditions_normalparam(imm_stock,
-                                      factor_f = initabun,
-                                      mean_f = initvonb,
-                                      stddev_f = initsd),
+    g3a_initialconditions_normalcv(imm_stock,
+                                   factor_f = initabun,
+                                   mean_f = gadget3::g3a_renewal_vonb_t0(K = vonb_K, by_stock = stocks),  # by_stock = stocks ensures Linf and t0 params are across stocks,
+                                   by_stock = stocks),
     
     ## NATURAL MORTALITY
-    gadget3::g3a_naturalmortality(imm_stock, gadget3::g3a_naturalmortality_exp()),
+    gadget3::g3a_naturalmortality(imm_stock, gadget3::g3a_naturalmortality_exp(by_stock = stocks)),
 
     ## AGEING
     gadget3::g3a_age(imm_stock, output_stocks = list(mat_stock)),
 
     ## GROWTH AND MATURITY
     gadget3::g3a_growmature(imm_stock,
-
                             ## Growth
                             impl_f = gadget3::g3a_grow_impl_bbinom(
-                              delta_len_f = gadget3::g3a_grow_lengthvbsimple(kappa_f = g3_parameterized('K',
-                                                                                                        by_stock = stocks,
-                                                                                                        by_year = timevarying_K),
-                                                                             by_stock = stocks),
+                              delta_len_f = gadget3::g3a_grow_lengthvbsimple(kappa_f = vonb_K, by_stock = stocks),
                               delta_wgt_f = gadget3::g3a_grow_weightsimple(),
-                              maxlengthgroupgrowth = maxlengthgroupgrowth,
-                              by_stock = stocks ## Ensures the bbin parameter across stocks within species
+                              beta_f = gadget3::g3_parameterized(name = 'bbin', 
+                                                                 by_stock = stocks, 
+                                                                 exponentiate = exponentiate_bbin),
+                              maxlengthgroupgrowth = maxlengthgroupgrowth
                             ),
-
                             ## Maturity
-                            maturity_f = gadget3::g3a_mature_continuous(),
+                            maturity_f = gadget3::g3a_mature_continuous(
+                              alpha = gadget3::g3_parameterized('mat_alpha', by_stock = TRUE),
+                              l50 = gadget3::g3_parameterized('mat_l50', by_stock = TRUE)
+                            ),
                             output_stocks = list(mat_stock),
                             transition_f = ~TRUE
     ),
 
     # RENEWAL
-    gadget3::g3a_renewal_normalparam(imm_stock, mean_f = initvonb),
+    gadget3::g3a_renewal_normalparam(imm_stock,
+                                     mean_f = gadget3::g3a_renewal_vonb_t0(K = vonb_K,
+                                                                           by_stock = stocks)),
     
     list()
     
@@ -110,13 +100,13 @@ mat_actions <-
   list(
     
     ## INITIAL CONDITIONS
-    g3a_initialconditions_normalparam(mat_stock,
+    g3a_initialconditions_normalcv(mat_stock,
                                       factor_f = initabun,
-                                      mean_f = initvonb,
-                                      stddev_f = initsd),
+                                      mean_f = gadget3::g3a_renewal_vonb_t0(K = vonb_K, by_stock = stocks),  # by_stock = stocks ensures Linf and t0 params are across stocks,
+                                      by_stock = stocks),
     
     ## NATURAL MORTALITY
-    gadget3::g3a_naturalmortality(mat_stock, gadget3::g3a_naturalmortality_exp()),
+    gadget3::g3a_naturalmortality(mat_stock, gadget3::g3a_naturalmortality_exp(by_stock = stocks)),
 
     ## AGEING
     gadget3::g3a_age(mat_stock),
@@ -125,13 +115,12 @@ mat_actions <-
     gadget3::g3a_growmature(mat_stock,
                             impl_f = gadget3::g3a_grow_impl_bbinom(
                               delta_len_f =
-                                gadget3::g3a_grow_lengthvbsimple(kappa_f = g3_parameterized('K',
-                                                                                            by_stock = stocks,
-                                                                                            by_year = timevarying_K),
-                                                                 by_stock = stocks),
+                                gadget3::g3a_grow_lengthvbsimple(kappa_f = vonb_K, by_stock = stocks),
                               delta_wgt_f = gadget3::g3a_grow_weightsimple(),
-                              maxlengthgroupgrowth = maxlengthgroupgrowth,
-                              by_stock = stocks)
+                              beta_f = gadget3::g3_parameterized(name = 'bbin', 
+                                                                 by_stock = stocks, 
+                                                                 exponentiate = exponentiate_bbin),
+                              maxlengthgroupgrowth = maxlengthgroupgrowth)
     ),
     
     list()

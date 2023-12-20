@@ -17,7 +17,7 @@ likelihood_actions <- list(
       obs_data = ldist.comm[[1]],
       fleets = list(comm),
       stocks = stocks,
-      g3l_distribution_sumofsquares(),
+      function_f = g3l_distribution_sumofsquares(),
       nll_breakdown = nll_breakdown,
       report = lik_report)
     
@@ -29,7 +29,7 @@ likelihood_actions <- list(
       obs_data = ldist.lln[[1]],
       fleets = list(lln),
       stocks = stocks,
-      g3l_distribution_sumofsquares(),
+      function_f = g3l_distribution_sumofsquares(),
       nll_breakdown = nll_breakdown,
       report = lik_report),
     
@@ -39,7 +39,7 @@ likelihood_actions <- list(
         filter(!(year == 2020 & step == 2)),
       fleets = list(bmt),
       stocks = stocks,
-      g3l_distribution_sumofsquares(),
+      function_f = g3l_distribution_sumofsquares(),
       nll_breakdown = nll_breakdown,
       report = lik_report)
     )
@@ -50,7 +50,7 @@ likelihood_actions <- list(
     obs_data = ldist.aut[[1]] %>% filter(year > 1999, year != 2011),
     fleets = list(aut),
     stocks = stocks,
-    g3l_distribution_sumofsquares(),
+    function_f = g3l_distribution_sumofsquares(),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
@@ -58,76 +58,91 @@ likelihood_actions <- list(
     
     g3l_catchdistribution(
       'matp_aut',
-      (matp.aut[[1]] %>% filter(year > 1999, year != 2011) %>% 
-         rename(stock = maturity_stage) %>%
-         mutate(stock = recode(as.factor(stock), blingimm = 'bling_imm', blingmat = 'bling_mat'))),
+      obs_data = (matp.aut[[1]] %>% 
+                    filter(year > 1999, year != 2011) %>% 
+                    rename(stock = maturity_stage) %>%
+                    mutate(stock = recode(as.factor(stock), blingimm = 'bling_imm', blingmat = 'bling_mat'))),
       fleets = list(aut),
       stocks = stocks,
-      g3l_distribution_sumofsquares(),
+      function_f = g3l_distribution_sumofsquares(),
       nll_breakdown = nll_breakdown,
       report = lik_report) 
   },
   
   g3l_abundancedistribution(
     'si_aut_1',
-    (aut.SI[[1]]$len20 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len20 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1), 
+    function_f = g3l_distribution_surveyindices_log(beta = 1), 
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_2a',
-    (aut.SI[[1]]$len52 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len52 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1), 
+    function_f = g3l_distribution_surveyindices_log(beta = 1), 
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_2b',
-    (aut.SI[[1]]$len60 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len60 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1),
+    function_f = g3l_distribution_surveyindices_log(beta = 1),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_3a',
-    (aut.SI[[1]]$len72 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len72 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1),
+    function_f = g3l_distribution_surveyindices_log(beta = 1),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_3b',
-    (aut.SI[[1]]$len80 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len80 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1),
+    function_f = g3l_distribution_surveyindices_log(beta = 1),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_3c',
-    (aut.SI[[1]]$len92 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len92 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1),
+    function_f = g3l_distribution_surveyindices_log(beta = 1),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   
   g3l_abundancedistribution(
     'si_aut_3d',
-    (aut.SI[[1]]$len100 %>% filter(year > 1999, year != 2011)) %>% filter(year < tyr - peel),
+    obs_data = (aut.SI[[1]]$len100 %>% 
+                  filter(year > 1999, year != 2011) %>% 
+                  filter(year < (max(defaults$year) - peel))),
     fleets = list(),
     stocks = stocks,
-    g3l_distribution_surveyindices_log(beta = 1),
+    function_f = g3l_distribution_surveyindices_log(beta = 1),
     nll_breakdown = nll_breakdown,
     report = lik_report),
   

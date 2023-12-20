@@ -1,7 +1,7 @@
 ## Useful constants
 ## Weight-Length relationship (Autumn survey)
 lw.constants <- 
-  mfdb_dplyr_sample(mdb) %>% 
+  mfdb::mfdb_dplyr_sample(mdb) %>%
   filter(species == local(defaults$species),
          sampling_type == 'AUT',
          !is.na(weight),
@@ -18,7 +18,7 @@ lw.constants$estimate[1] <- exp(lw.constants$estimate[1])
 
 ## initial conditions sigma
 init.sigma <- 
-  mfdb_dplyr_sample(mdb) %>% 
+  mfdb::mfdb_dplyr_sample(mdb) %>% 
   dplyr::filter(species == local(defaults$species), 
                 !is.na(length),
                 !is.na(age),
@@ -41,7 +41,7 @@ init.sigma.coef <-
 
 ## initial guess for the maturity ogive:
 mat.l50 <- 
-  mfdb_dplyr_sample(mdb) %>% 
+  mfdb::mfdb_dplyr_sample(mdb) %>% 
   filter(species == local(defaults$species),
          sampling_type == 'AUT',
          !is.na(maturity_stage)) %>% 

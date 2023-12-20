@@ -4,21 +4,20 @@
 
 ## Autumn survey indices
 aut.SI <- 
-  mfdb_sample_count(mdb, 
-                    c('length'), 
-                    c(list(
-                      data_source = 'iceland-ldist',
-                      sampling_type = 'AUT',
-                      length = mfdb_interval('len', c(20,52,60,72,80,92,100,140), open_ended = c('lower', 'upper'))),
-                      defaults)) %>% 
-  #.[[1]] %>%
+  mfdb::mfdb_sample_count(mdb, 
+                          c('length'), 
+                          c(list(
+                            data_source = 'iceland-ldist',
+                            sampling_type = 'AUT',
+                            length = mfdb::mfdb_interval('len', si_length_intervals, open_ended = c('lower', 'upper'))),
+                            defaults)) %>% 
   purrr::map(function(y){
     y %>% 
       split(.,~length) %>% 
       purrr::map(function(x){
         structure(x, length = attr(x, 'length')[unique(x$length)])
-      })
-  }) 
+        })
+    }) 
 
 
 ## OUTPUT

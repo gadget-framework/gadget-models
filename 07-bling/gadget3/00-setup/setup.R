@@ -11,60 +11,64 @@ library(gadgetplots)
 library(tidyverse)
 library(g3experiments)
 
-## Model directory
-base_dir <- '07-bling/gadget3'
-## Model version
-vers <- 'models/01-baseline'
-
 ## -----------------------------------------------------------------------------
 ## OPTIONS 
 ## -----------------------------------------------------------------------------
 
-## Whether or not to call the setup-data scripts
+## Model directory and version, output will be stored in file.path(base_dir, vers)
+base_dir <- '07-bling/gadget3'
+vers <- 'models/01-baseline'
+
+## Model year range and species code
+year_range <- 1982:2020
+species_name <- 'bli' 
+
+## Whether or not to call the setup-data scripts, if FALSE, the datasets will be loaded from file.path(base_dir, "data")
 read_data <- FALSE
 
-## Setup options -
-## Parameters:
-include_bound_penalty <- TRUE
-
 ## Stock options options:
-single_stock_model <- TRUE
-maxlengthgroupgrowth <- 5  # Maximum length group growth
-lencv <- 0.1               # CV for initial conditions standard deviations
-timevarying_K <- FALSE
-exponentiate_bbin <- FALSE  # Whether or not to exponentiate the beta-binomial parameter
+single_stock_model <- FALSE
+maxlengthgroupgrowth <- 5      # Maximum length group growth
+lencv <- 0.1                   # CV for initial conditions standard deviations
+timevarying_K <- TRUE         # Have the growth parameter K vary by years
+exponentiate_bbin <- TRUE     # Whether or not to exponentiate the beta-binomial parameter
+init_abund_by_age <- FALSE      # Will have a parameter per age group
+init_abund_by_stock <- FALSE    # Will have a parameter per age group per stock (irrelevant for single stock model)
 
 ## Fleet options:
 single_fleet <- FALSE            # Single commercial fleet?
-dome_comm <- TRUE             # Only applies if single_fleet == TRUE
-dome_bmt <- FALSE             # Only applies if single_fleet == FALSE
-dome_lln <- FALSE             # Only applies if single_fleet == FALSE
+dome_comm <- TRUE                # Only applies if single_fleet == TRUE
+dome_bmt <- FALSE                # Only applies if single_fleet == FALSE
+dome_lln <- TRUE                # Only applies if single_fleet == FALSE
+dome_aut <- FALSE
 
-## Different options for running g3 and its diagnostics
+## Likelihood options:
+si_length_intervals <- c(20,52,60,72,80,92,100,140)     # Length intervals for slicing the SIs
+
+## Which diagnostics would you like to run
 run_iterative <- FALSE
 run_jitter <- FALSE
-run_retro <- FALSE
-run_leaveout <- FALSE
+# run_retro <- FALSE      Not implemented yet
+# run_bootstrap <- FALSE  Not implemented yet
 
-# Controls for g3_optim, see ?optim
-optim_controls <- list(maxit = 3, reltol = 1e-10)#.Machine$double.eps^2)
+## Iterative settings
+iterative_folder <- 'WGTS'    # Folder within file.path(base_dir, vers) which will store the output of iterative re-weighting
+cv_floor <- 0                 # Option can be used to prevent the overfitting of survey indices, see ?g3_iterative
+iter_group_SI <- FALSE        # whether or not to group all SI's together for optimisation
+iter_group_aut <- FALSE       # group together autumn likelihood components
 
-## Iterative re-weighting options:
-cv_floor <- 0
-iter_group_SI <- FALSE         # whether or not to group all SI's together for optimisation
-iter_group_aut <- FALSE        # group together autumn likelihood components
+## Jitter settings
+jitter_folder <- 'JITTER'               # Folder within file.path(base_dir, vers) which will store the output of the jitter analysis
+number_of_jitters <- 100                # How many jitters are required
+jitter_optimised_pars <- FALSE          
 
 ## Retrospective analysis options:
 peel <- 0
 npeels <- 6
 
-## Jitter options:
-njits <- 3    #100
-
-## -----------------------------------------------------------------------------
-tyr <- lubridate::year(Sys.Date())
-year_range <- 1982:(tyr - 1)
-species_name <- 'bli' 
+## Optimisation settings
+include_bound_penalty <- TRUE   # Whether or not to include a penalty for when parameters go outside their bounds
+optim_controls <- list(maxit = 3, reltol = 1e-10)#.Machine$double.eps^2)  # controls for g3_optim, see ?optim
 
 ## -----------------------------------------------------------------------------
 
@@ -75,8 +79,8 @@ reitmapping <-
     as.is=TRUE)
 
 defaults <- list(
-  area = mfdb_group("1" = unique(reitmapping$SUBDIVISION)),
-  timestep = mfdb_timestep_quarterly,
+  area = mfdb::mfdb_group("1" = unique(reitmapping$SUBDIVISION)),
+  timestep = mfdb::mfdb_timestep_quarterly,
   year = year_range,
   species = toupper(species_name))
 
@@ -87,28 +91,27 @@ areas <- structure(
 
 # Timekeeping for the model, i.e. how long we run for
 time_actions <- list(
-  g3a_time(start_year = min(defaults$year), 
-           end_year = max(defaults$year),
-           defaults$timestep),
+  gadget3::g3a_time(start_year = min(defaults$year), 
+                    end_year = max(defaults$year),
+                    defaults$timestep),
   list())
 
 ## Data and model folders
 fs::dir_create(file.path(base_dir, c('data')))
-fs::dir_create(file.path(base_dir, vers))
-fs::dir_create(file.path(base_dir, vers, c('RETRO', 'WGTS', 'JITTER', 'LEAVEOUT')))
+fs::dir_create(file.path(base_dir, vers, c(iterative_folder, jitter_folder)))
 
 ## ------------------------------------------------------------------------------------
 
 source(file.path(base_dir, '00-setup', 'setup-stocks.R'))  # Generates stock objects
 
 if (single_stock_model){
-  source(file.path(base_dir, '00-setup', 'setup-model-single-stock.R'))  # Generates mat_stock_actions / imm_stock_actions  
+  source(file.path(base_dir, '00-setup', 'setup-model-single-stock.R'))  # Generates stock actions for single_stock
 }else{
-  source(file.path(base_dir, '00-setup', 'setup-model.R'))  # Generates mat_stock_actions / imm_stock_actions  
+  source(file.path(base_dir, '00-setup', 'setup-model.R'))  # Generates mat_stock actions and imm_stock actions  
 }
 
-
 ## Load data objects ----------------------------------------------------------
+
 if(read_data){
   mdb <- mfdb('Iceland', db_params = list(host = 'mfdb.hafro.is'))
   #mdb <- mfdb("../../mfdb/copy/iceland.duckdb")
@@ -124,13 +127,11 @@ if(read_data){
 
 ## Configure model actions ------------------------------------------------------------
 
-
 source(file.path(base_dir, '00-setup', 'setup-fleets.R'))  # Generates fleet_actions
 source(file.path(base_dir, '00-setup', 'setup-likelihood.R'))  # Generates likelihood_actions
 #source(file.path(base_dir, '00-setup', 'setup-randomeffects.R'))  # Generates random actions
 
 ##### Compile the r- and tmb-based models ######################################
-
 
 ## Collate actions
 actions <- c(
@@ -143,67 +144,69 @@ actions <- c(
 )
 
 # Turn actions into an R function
-model <- g3_to_r(actions)#, strict = TRUE, trace = TRUE)
+model <- gadget3::g3_to_r(actions, strict = FALSE, trace = FALSE)
 
 # Turn actions into C++ objective function code
-tmb_model <- g3_to_tmb(actions)
+tmb_model <- gadget3::g3_to_tmb(actions)
 
-## Fill in the parameter template
 tmb_param <- 
   attr(tmb_model, 'parameter_template') %>% 
-  g3_init_guess('\\.rec', 100, 0.001, 200, 1) %>% # ifelse(random_recruitment, penalise_recruitment, 1)) %>% 
-  g3_init_guess('\\.init.[0-9]', 100, 0.001, 200, 1) %>% #ifelse(random_initial, penalise_initial, 1)) %>% 
-  g3_init_guess('recl', 30, 10, 50, 1) %>% 
-  g3_init_guess('reclcv', lencv, lencv*0.9, lencv*1.1, 0) %>% 
-  g3_init_guess('lencv', 0.2, 0.1, 0.3, 0) %>% 
-  g3_init_guess('rec.sd', 5, 4, 20, 1) %>% 
-  g3_init_guess('init.scalar', 50, 1, 100, 1) %>% 
-  g3_init_guess('rec.scalar', 5, 1, 10, 1) %>% 
-  g3_init_guess('init.rec.scalar', 50, 1, 100, 1) %>% 
-  #g3_init_guess('\\.rec.sigma', 0.2, -1, 1, 0) %>% 
-  g3_init_guess('Linf', 140, 100, 200, 1) %>% 
-  g3_init_guess('\\.K', 0.09, 0.04, 0.2, 1) %>%
-  g3_init_guess('\\.t0', 1, -1, 5, 0) %>%
-  g3_init_guess('bbin', 100, 1e-05, 1000, 1) %>% 
-  g3_init_guess('\\.alpha', 0.5, 0.01, 3, 1) %>% 
-  g3_init_guess('\\.l50', 50, 10, 100, 1) %>% 
-  g3_init_guess('init.F', 0, 0.1, 1, 0) %>% 
-  g3_init_guess('\\.M$', 0.15, 0.001, 1, 0) %>% 
-  g3_init_guess('^M$', 0.15, 0.001, 1, 0) %>%  
-  g3_init_guess('mat_initial_alpha', 1, 0.5, 2, 1) %>% 
-  g3_init_guess('mat_initial_a50', 7, 3, 15, 0) %>% 
-  g3_init_guess('mat.alpha', 0.07, 0.01, 0.2, 1) %>%
-  g3_init_guess('mat.l50', mat.l50$l50, 0.75*mat.l50$l50, 1.25*mat.l50$l50, 1) %>%
-  g3_init_guess('sigma_alpha', init.sigma.coef[['alpha']]) %>%
-  g3_init_guess('sigma_beta', init.sigma.coef[['beta']]) %>%
-  g3_init_guess('sigma_gamma', init.sigma.coef[['gamma']]) %>% 
+  
+  ## Recruitment and initial conditions
+  gadget3::g3_init_val('*.rec.#', 100, lower = 0.001, upper = 200) %>% # ifelse(random_recruitment, penalise_recruitment, 1)) %>% 
+  gadget3::g3_init_val('*.init.#', 100, lower = 0.001, upper = 200) %>% #ifelse(random_initial, penalise_initial, 1)) %>% 
+  gadget3::g3_init_val('*.rec.scalar', 50, spread = 0.99) %>% 
+  gadget3::g3_init_val('*.init.scalar', 5000, spread = 0.99) %>%
+  gadget3::g3_init_val('init.F', 
+                       ifelse((!init_abund_by_age && !init_abund_by_stock), 0.2, 0), 
+                       spread = {if (!init_abund_by_age && !init_abund_by_stock) 0.75 else NULL}) %>% 
+  gadget3::g3_init_val('*.lencv', lencv) %>%   # Used to calculate length sd (in initial conditions)
+  gadget3::g3_init_val('*.rec.sd', 15, spread = 0.6) %>%     # To use lencv here, use g3a_renewal_normalcv instead of g3a_renewal_normalparam
+
+  ## Growth
+  gadget3::g3_init_val('*.Linf', 140, spread = 0.3) %>% 
+  gadget3::g3_init_val(ifelse(timevarying_K, '*.K.#', '*.K'), 0.1, spread = 0.5) %>%
+  gadget3::g3_init_val('*.t0', 1, lower = -1, upper = 5) %>%
+  # gadget3::g3_init_val('*.recl', 30, spread = 0.5) %>%       Using t0 (g3a_renewal_vonb_t0) instead of recl (g3a_renewal_vonb_recl)
+  gadget3::g3_init_val('*.bbin', 100, lower = 1e-05, upper = 1000) %>% 
+  gadget3::g3_init_val('*.M.#', 0.15) %>% 
+  
+  ## Maturity ogives
+  #  For initial conditions if init_abund_mode = 1
+  gadget3::g3_init_val('*.mat_initial_alpha', 1, spread = 0.5) %>% 
+  gadget3::g3_init_val('*.mat_initial_a50', 7) %>% 
+  #  For maturation
+  gadget3::g3_init_val('*.mat_alpha', 0.08, spread = 0.75) %>%
+  gadget3::g3_init_val('*.mat_l50', mat.l50$l50, spread = 0.25) %>% 
   
   ## Fleet selection parameters
-  g3_init_guess('andersen.p0$', 0, NA, NA, 0) %>%
-  g3_init_guess('andersen.p2$', 1, NA, NA, 0) %>%
-  g3_init_guess('andersen.L$', max(unlist(lapply(stocks, gadget3::g3_stock_def, 'minlen'))), NA, NA, 0) %>%
-  g3_init_guess('\\.p1$', log(2), 0, 3, 1) %>%
-  g3_init_guess('\\.p3$', 0.1, 0, 10, 1) %>%
-  g3_init_guess('\\.p4$', 0.02, 0, 1e3, 1) %>%
+  #  S-shaped
+  gadget3::g3_init_val('*.alpha', 1, spread = 0.99) %>% 
+  gadget3::g3_init_val('*.l50', mean(sapply(stocks, gadget3::g3_stock_def, 'midlen')), spread = 0.5) %>% 
+  #  Dome-shaped
+  gadget3::g3_init_val('*.p1', log(2), lower = 0, upper = 3) %>%
+  gadget3::g3_init_val('*.p3', 0.1, lower = 0.001, upper = 10) %>%
+  gadget3::g3_init_val('*.p4', 0.02, lower = 0.001, upper = 1e3) %>%
   
   ## Random effects/penalities
-  # g3_init_guess('recruitment_sigma', 0.2, 0.01, 10, ifelse(penalise_recruitment == 0, 1, 0)) %>% 
-  # g3_init_guess('initial_sigma', 0.2, 0.01, 10, ifelse(penalise_initial == 0, 1, 0)) %>% 
-  # g3_init_guess('rnd_recruitment_weight', 1, 0.01, 100, 0) %>% 
-  # g3_init_guess('rnd_initial_weight', 1, 0.01, 100, 0) %>% 
-  # g3_init_guess('zero', 0, -1, 1, 0) %>% 
+  # gadget3::g3_init_val('recruitment_sigma', 0.2, 0.01, 10, ifelse(penalise_recruitment == 0, 1, 0)) %>% 
+  # gadget3::g3_init_val('initial_sigma', 0.2, 0.01, 10, ifelse(penalise_initial == 0, 1, 0)) %>% 
+  # gadget3::g3_init_val('rnd_recruitment_weight', 1, 0.01, 100, 0) %>% 
+  # gadget3::g3_init_val('rnd_initial_weight', 1, 0.01, 100, 0) %>% 
+  # gadget3::g3_init_val('zero', 0, -1, 1, 0) %>% 
   
   ## Weight-length
-  g3_init_guess('walpha', lw.constants$estimate[1]) %>% 
-  g3_init_guess('wbeta', lw.constants$estimate[2])
+  gadget3::g3_init_val('*.walpha', lw.constants$estimate[1]) %>% 
+  gadget3::g3_init_val('*.wbeta', lw.constants$estimate[2]) %>% 
+  gadget3::g3_init_val('recage', min(sapply(stocks, gadget3::g3_stock_def, 'minage')))
 
 
 ## --------------------------------------------------------------------------
 
 if (include_bound_penalty){
-  actions <- c(actions, list(g3l_bounds_penalty(tmb_param %>% filter(!grepl('_sigma$|_sigma_exp$',switch)))))
-  model <- g3_to_r(actions)
-  tmb_model <- g3_to_tmb(actions)
+  actions <- c(actions, list(gadget3::g3l_bounds_penalty(tmb_param %>% filter(!grepl('_sigma$|_sigma_exp$',switch)))))
+  model <- gadget3::g3_to_r(actions)
+  tmb_model <- gadget3::g3_to_tmb(actions)
 }
 
 ## Run the R-model
@@ -223,13 +226,13 @@ save(tmb_model, file = file.path(base_dir, vers, 'tmb_model.Rdata'))
 ## Setup grouping for iterative re-weighting 
 if (iter_group_SI){
   
-  grouping <- list(sind = c('log_si_aut_1',
-                            'log_si_aut_2a',
-                            'log_si_aut_2b',
-                            'log_si_aut_3a',
-                            'log_si_aut_3b',
-                            'log_si_aut_3c',
-                            'log_si_aut_3d'))
+  grouping <- list(sind = c('si_aut_1',
+                            'si_aut_2a',
+                            'si_aut_2b',
+                            'si_aut_3a',
+                            'si_aut_3b',
+                            'si_aut_3c',
+                            'si_aut_3d'))
   if (!single_fleet){
     grouping <- c(grouping,
                   list(aut = c('ldist_aut', if (iter_group_aut) 'matp_aut' else NULL)))
@@ -238,13 +241,13 @@ if (iter_group_SI){
   }
 }else{
   
-  grouping <- list(sind1 = c('log_si_aut_1',
-                             'log_si_aut_2a',
-                             'log_si_aut_2b'),
-                   sind2 = c('log_si_aut_3a',
-                             'log_si_aut_3b',
-                             'log_si_aut_3c',
-                             'log_si_aut_3d'))
+  grouping <- list(sind1 = c('si_aut_1',
+                             'si_aut_2a',
+                             'si_aut_2b'),
+                   sind2 = c('si_aut_3a',
+                             'si_aut_3b',
+                             'si_aut_3c',
+                             'si_aut_3d'))
   if (!single_fleet){
     grouping <- c(grouping,
                   list(aut = c('ldist_aut', if (iter_group_aut) 'matp_aut' else NULL)))
