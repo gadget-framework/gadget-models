@@ -12,3 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Gadget models
 
 Add stuff here
+
+## Models elsewhere
+
+* https://github.com/Fishing-into-the-future/random-effects
