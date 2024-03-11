@@ -46,9 +46,9 @@ dome_aut <- FALSE
 si_length_intervals <- c(20,52,60,72,80,92,100,140)     # Length intervals for slicing the SIs
 
 ## Which diagnostics would you like to run
-run_iterative <- FALSE
+run_iterative <- TRUE
 run_jitter <- FALSE
-# run_retro <- FALSE      Not implemented yet
+run_retro <- TRUE
 # run_bootstrap <- FALSE  Not implemented yet
 
 ## Iterative settings
@@ -143,11 +143,14 @@ actions <- c(
   NULL
 )
 
-# Turn actions into an R function
-model <- gadget3::g3_to_r(actions, strict = FALSE, trace = FALSE)
-
 # Turn actions into C++ objective function code
-tmb_model <- gadget3::g3_to_tmb(actions)
+tmb_model <- gadget3::g3_to_tmb(c(actions,
+                                  list(gadget3::g3a_report_detail(actions)),
+                                  list(gadget3::g3l_bounds_penalty(actions)),
+                                  NULL))
+
+# Turn actions into an R function
+model <- gadget3::g3_to_r(attr(tmb_model, 'actions'), strict = FALSE, trace = FALSE)
 
 tmb_param <- 
   attr(tmb_model, 'parameter_template') %>% 
@@ -202,12 +205,6 @@ tmb_param <-
 
 
 ## --------------------------------------------------------------------------
-
-if (include_bound_penalty){
-  actions <- c(actions, list(gadget3::g3l_bounds_penalty(tmb_param %>% filter(!grepl('_sigma$|_sigma_exp$',switch)))))
-  model <- gadget3::g3_to_r(actions)
-  tmb_model <- gadget3::g3_to_tmb(actions)
-}
 
 ## Run the R-model
 result <- model(tmb_param$value)
@@ -308,11 +305,12 @@ if (run_retro){
         fleet_actions,
         likelihood_actions,
         if (penalise_recruitment) random_actions else NULL,
-        time_actions,
-        list(g3l_bounds_penalty(tmb_param %>% 
-                                  filter(!grepl('_sigma$|_sigma_exp$',switch, optimise))))# filter(optimise, !grepl('\\.init\\.[0-9]|\\.rec\\.[0-9]', switch)))))filter(optimise, !grepl('\\.init\\.[0-9]|\\.rec\\.[0-9]', switch))))
-      )
-    retro_model[[peel]] <- g3_to_tmb(retro_actions)
+        time_actions)
+    
+    retro_model[[peel]] <- g3_to_tmb(c(retro_actions,
+                                       list(gadget3::g3a_report_detail(retro_actions)),
+                                       list(gadget3::g3l_bounds_penalty(retro_actions)),
+                                       NULL))
     retro_params[[peel]] <- params_final# retro_pars #gadgetutils::jitter_params(params_final)
     retro_params[[peel]]$value$retro_years <- peel
   } 
