@@ -1,6 +1,11 @@
 ## -----------------------------------------------------------------------------
 ##
-## Runner to build a Gadget3 model for Blue Ling 
+## Scripts to set up a gadget model for blue ling in Icelandic and Greenlandic waters
+##
+## Data is provided, therefore to run the model ensure the following options are set:  
+## read_data = FALSE
+## read_bootstrap_data = FALSE
+## run_bootstrap = FALSE
 ##
 ## -----------------------------------------------------------------------------
 
@@ -8,7 +13,8 @@ library(mfdb)
 library(gadget3)
 library(gadgetutils)
 library(gadgetplots)
-library(mar)
+library(tidyverse)
+#library(mar)
 #library(g3experiments)
 
 ## Model directory
@@ -65,7 +71,7 @@ read_data <- FALSE
 read_bootstrap_data <- FALSE
 
 ## Which model diagnostics to run
-run_iterative <- TRUE
+run_iterative <- FALSE
 run_retro <- FALSE
 run_bootstrap <- FALSE
 run_mprofile <- FALSE
