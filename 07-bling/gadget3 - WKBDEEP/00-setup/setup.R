@@ -1,11 +1,6 @@
 ## -----------------------------------------------------------------------------
 ##
-## Scripts to set up a gadget model for blue ling in Icelandic and Greenlandic waters
-##
-## Data is provided, therefore to run the model ensure the following options are set:  
-## read_data = FALSE
-## read_bootstrap_data = FALSE
-## run_bootstrap = FALSE
+## Runner to build a Gadget3 model for Blue Ling 
 ##
 ## -----------------------------------------------------------------------------
 
@@ -13,25 +8,30 @@ library(mfdb)
 library(gadget3)
 library(gadgetutils)
 library(gadgetplots)
-library(tidyverse)
 #library(mar)
+library(tidyverse)
 #library(g3experiments)
 
 ## Model directory
-base_dir <- '07-bling/gadget3 - WKBDEEP'
+base_dir <- 'benchmarks/WKBDEEP/gadget3'
 
 ## Model version
-vers <- 'models/22-variant'
+vers <- 'models/25-variant'
 #vers <- 'models/07-baseline'
 ## For the baseline model we will fix Linf, estimate k and t0
 ## Some easy options for alternative models
 faroe_growth <- FALSE
+growth_origin <- 'cc'         
 faroe_M <- FALSE
-estimate_linf <- TRUE
+estimate_linf <- FALSE
 estimate_k <- TRUE
 estimate_t0 <- FALSE
 estimate_phi <- FALSE
 estimate_reccv <- FALSE
+fix_bbin <- FALSE
+bbin_start <- 500
+bbin_upper <- 1000
+
 
 
 #fixed_growth_pars <- list(linf = 125, k = 0.152, t0 = 1.552)
@@ -43,7 +43,17 @@ if (faroe_growth){
   fixed_growth_pars <- list(linf = 129, k = 0.11, t0 = -1.16)  ## Faroes - data
   #fixed_growth_pars <- list(linf = 132.8939, k = 0.1042, t0 = 1.552)     
 }else{
-  fixed_growth_pars <- list(linf = 134.4084, k = 0.1016, t0 = 0)  ## Iceland and Faroes
+  fixed_growth_pars <- list(cc = list(linf = 136.12052,  ## Combined
+                                            k = 0.09853, 
+                                            t0 = 0),
+                            ii = list(linf = 187.23165,  ## IVeland
+                                           k = 0.05654, 
+                                           t0 = 0),
+                            ff = list(linf = 125.1648,    ## Faroes
+                                          k = 0.1264, 
+                                          t0 = 0))
+  
+  fixed_growth_pars <- fixed_growth_pars[[growth_origin]]
 }
 
 ## Penalising recruitment or not?
@@ -56,8 +66,8 @@ arima_phi <- 0
 naturalmortality <- ifelse(faroe_M, 0.11, 0.15)
 
 # Composition data - 
-bmt_age <- TRUE             # whether to include the commercial trawl age readings
-bmt_age_stratified <- FALSE       # If including commercial age readings, should they be stratified in the likelihood
+bmt_age <- FALSE             # whether to include the commercial trawl age readings
+bmt_age_stratified <- TRUE       # If including commercial age readings, should they be stratified in the likelihood
 iter_group_BMTAGE <- FALSE
 
 stratified_indices <- TRUE
@@ -71,8 +81,8 @@ read_data <- FALSE
 read_bootstrap_data <- FALSE
 
 ## Which model diagnostics to run
-run_iterative <- FALSE
-run_retro <- FALSE
+run_iterative <- TRUE
+run_retro <- TRUE
 run_bootstrap <- FALSE
 run_mprofile <- FALSE
 run_growthprofile <- FALSE
@@ -92,6 +102,8 @@ exponentiate_bbin <- TRUE            # exponentiate the beta-binomial parameter
 maxlengthgroupgrowth <- 4             # Maximum length group growth
 lencv <- 0.1                          # CV for initial conditions standard deviations
 mean_len_recl <- FALSE
+female_weight_length <- FALSE
+female_maturation <- FALSE
 
 ## Initial abundance mode
 # 4 options:
@@ -106,7 +118,7 @@ initabun_by_stock <- FALSE
 single_fleet <- FALSE            # Single commercial fleet?
 dome_comm <- FALSE              # Only applies if single_fleet == TRUE
 dome_bmt <- FALSE                # Only applies if single_fleet == FALSE
-dome_lln <- FALSE                # Only applies if single_fleet == FALSE
+dome_lln <- FALSE              # Only applies if single_fleet == FALSE
 timevarying_bmt <- FALSE         # Only applies to S-shaped at the moment
 timevarying_lln <- FALSE        # Only applies to S-shaped at the moment 
  
@@ -117,7 +129,7 @@ include_bound_penalty <- TRUE
 selection_si_lik <- FALSE
 #si_len_breaks <- c(20,52,60,72,80,92,100,140)
 si_len_breaks <- c(20,44,56,68,80,92,104,140)
-si_len_slopes <- NULL#c(20,44)                           # NULL to have slope = 1 for each component
+si_len_slopes <- NULL#c(20,44,56)                           # NULL to have slope = 1 for each component
 si_cv <- 0.2
 
 ## DIAGNOSTICS
@@ -153,7 +165,7 @@ gw_values <-
 
 ## Retro options:
 retro_folder <- 'RETRO'
-number_of_peels <- 5
+number_of_peels <- 6
 
 ## Bootstrap options:
 boot_folder <- 'BOOTSTRAP'                # Bootstrap results will be written to file.path(base_dir, vers, boot_folder)
@@ -209,7 +221,10 @@ vers <- paste0(vers,
                {if (timevarying_lln) '_llnTV' else NULL},
                {if (!mean_len_recl) '_t0' else NULL},
                {if (!is.null(si_len_slopes)) '_sislope' else NULL},
-               {if (!iter_group_SI) '_aut2gp' else NULL})
+               {if (!iter_group_SI) '_aut2gp' else NULL},
+               {if (female_maturation) '_Fmat' else NULL},
+               {if (female_weight_length) '_Fwl' else NULL},
+               paste0('_', growth_origin))
 
 ## -----------------------------------------------------------------------------
 
@@ -323,7 +338,7 @@ tmb_param <-
   g3_init_val('*.t0', ifelse(estimate_t0, -1, fixed_growth_pars$t0), lower = -2, upper = 0, optimise = estimate_t0) |>
   g3_init_val('*.recl', 15, lower = 10, upper = 40) |>  #     Using t0 (g3a_renewal_vonb_t0) instead of recl (g3a_renewal_vonb_recl)
   g3_init_val('*.recl.cv', init.cv[init.cv$age == g3_stock_def(imm_stock, 'minage'), 'cv'][[1]], lower = 0.05, upper = 0.5, optimise = estimate_reccv) |>  #     Using t0 (g3a_renewal_vonb_t0) instead of recl (g3a_renewal_vonb_recl)
-  g3_init_val('*.bbin', 500, lower = 1e-03, upper = 1000) |> 
+  g3_init_val('*.bbin', bbin_start, lower = 1e-03, upper = bbin_upper, optimise = !fix_bbin) |> 
   g3_init_val('*.M.#', naturalmortality) |> 
   
   ## Fleet selection parameters
@@ -358,8 +373,12 @@ tmb_param <-
   g3_init_val('zero', 0) |> 
   
   ## Weight-length
-  g3_init_val('*.walpha', lw.constants$estimate[1]) |> 
-  g3_init_val('*.wbeta', lw.constants$estimate[2]) |> 
+  g3_init_val('*.walpha', ifelse(female_weight_length, 
+                                 lw.constants[['Fm']]$estimate[1],
+                                 lw.constants[['MFm']]$estimate[1])) |> 
+  g3_init_val('*.wbeta', ifelse(female_weight_length,
+                                lw.constants[['Fm']]$estimate[2],
+                                lw.constants[['MFm']]$estimate[2])) |> 
   
   ## Recruitment/Spawning
   g3_init_val('bling_rec_scalar', value = 20, spread = 0.99) |> 
@@ -379,7 +398,6 @@ if (timevarying_K) tmb_param <- g3_init_guess(tmb_param, '\\.K', 0.12, 0.1, 0.14
 ## Run the R-model
 result <- model(tmb_param$value)
 result[[1]]
-
 #gadgetplots::gadget_plots(g3_fit(model, tmb_param), file_type = 'html', path = 'tmp2', template = 'iceland_bling')
 
 # List all available reports
@@ -502,7 +520,7 @@ if (run_iterative){
   ## Get the model fit
   fit <- g3_fit(model, params.out |> g3_init_guess('project_years', 1))
   save(fit, file = file.path(base_dir, vers, 'WGTS/fit.Rdata'))
-  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', template = 'iceland_bling')
+  #gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', template = 'iceland_bling')
   
   sdout <- TMB::sdreport(obj.fun, g3_tmb_par(params.out))
   save(sdout, file = file.path(base_dir, vers, 'WGTS/sdout.Rdata'))

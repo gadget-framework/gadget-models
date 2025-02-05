@@ -1,20 +1,45 @@
 ## Useful constants
 ## Weight-Length relationship (Autumn survey)
 lw.constants <- 
-  mfdb_dplyr_sample(mdb) %>% 
-  filter(species == local(defaults$species),
-         sampling_type == 'AUT',
-         !is.na(weight),
-         !is.na(length),
-         weight > 0,
-         length > 10) %>% 
-  select(length,weight) %>% 
-  collect(n=Inf) %>% 
-  lm(log(weight/1e3)~log(length),.) %>% 
-  broom::tidy() %>% 
-  select(estimate)
+  list(MFm = 
+         mfdb_dplyr_sample(mdb) %>% 
+         filter(species == local(defaults$species),
+                sampling_type == 'AUT',
+                !is.na(weight),
+                !is.na(length),
+                weight > 0,
+                length > 10) %>% 
+         select(length,weight) %>% 
+         collect(n=Inf) %>% 
+         lm(log(weight/1e3)~log(length),.) %>% 
+         broom::tidy() %>% 
+         select(estimate),
+       Fm = 
+         mfdb_dplyr_sample(mdb) %>% 
+         filter(species == local(defaults$species),
+                sex == 'F',
+                sampling_type == 'AUT',
+                !is.na(weight),
+                !is.na(length),
+                weight > 0,
+                length > 10) %>% 
+         select(length,weight) %>% 
+         collect(n=Inf) %>% 
+         lm(log(weight/1e3)~log(length),.) %>% 
+         broom::tidy() %>% 
+         select(estimate)
+         )
+  
 ## transport back to right dimension
-lw.constants$estimate[1] <- exp(lw.constants$estimate[1])
+lw.constants$MFm$estimate[1] <- exp(lw.constants$MFm$estimate[1])
+lw.constants$Fm$estimate[1] <- exp(lw.constants$Fm$estimate[1])
+
+data.frame(l = 1:120) |> 
+  mutate(w_comb = lw.constants$MFm$estimate[1]*l^lw.constants$MFm$estimate[2],
+         female = lw.constants$Fm$estimate[1]*l^lw.constants$Fm$estimate[2]) |> 
+  pivot_longer(cols = c('w_comb', 'female')) |> 
+  ggplot(aes(l, value)) + 
+  geom_line(aes(col = name))
 
 ## initial conditions sigma
 init.sigma <- 
@@ -29,10 +54,11 @@ init.sigma <-
   dplyr::group_by(age) %>% 
   dplyr::summarise(ml=mean(length,na.rm=TRUE),ms=sd(length,na.rm=TRUE), n=length(na.exclude(length)))
 
+mar <- connect_mar()
 init.cv <- 
   les_syni(mar) |>
   left_join(les_stod(mar)) |>
-  filter(ar < tyr) |>
+  #filter(ar <= max(local(year_range))) |>
   inner_join(les_aldur(mar) |> filter(tegund_nr == 7, aldur > 0)) |> 
   collect(n = Inf) |> 
   drop_na(aldur, lengd) |> 
@@ -50,6 +76,8 @@ init.cv <-
   group_by(age) |> 
   summarise(mean = mean(length), sd = sd(length), n = n()) |> 
   mutate(cv = round(sd/mean, 2))
+
+DBI::dbDisconnect(mar)
 
 ## Initial coefficients for sd
 init.sigma.coef <- 

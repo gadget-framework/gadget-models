@@ -39,9 +39,6 @@ rec_list <-
 ## Precautionary reference points (flim): no assessment error and no Btrigger
 ## -----------------------------------------------------------------------------
 
-hr_trials <- 1
-harvest_rates <- 0.1
-
 projpar_pre <- g3p_setup_pars(tmb_model, param_list, 
                               blim*1e3, btrigger = 1,
                               harvest_rates, hr_trials,

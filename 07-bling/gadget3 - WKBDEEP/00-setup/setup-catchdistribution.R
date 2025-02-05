@@ -38,8 +38,22 @@ matp.aut <-
                                                        open_ended = c('lower','upper')),              
                                 maturity_stage = mfdb_group(blingimm = 1, blingmat = 2:5))))
 
+matp.aut_F <- 
+  mfdb_sample_count(mdb, c('maturity_stage','age','length'),
+                    append(defaults,
+                           list(sampling_type='AUT',
+                                sex = 'F',
+                                #age=mfdb_group(mat_ages=minage:maxage),
+                                length = mfdb_interval('len',
+                                                       seq(minlen, maxlen, by = 2*dl),
+                                                       open_ended = c('lower','upper')),              
+                                maturity_stage = mfdb_group(blingimm = 1, blingmat = 2:5))))
+
 for(i in seq_along(matp.aut)){
   attributes(matp.aut[[i]])$age$all <- minage:maxage
+}
+for(i in seq_along(matp.aut_F)){
+  attributes(matp.aut_F[[i]])$age$all <- minage:maxage
 }
 
 ldist.aut[[1]]$step <- 4
@@ -183,11 +197,11 @@ attributes(ldist.is[[1]])$length <- attributes(ldist.bmt[[1]])$length
 
 ## OUTPUT
 if (defaults$save_bootstrap_data){
-  save(ldist.aut, matp.aut,
+  save(ldist.aut, matp.aut, matp.aut_F,
        ldist.lln, ldist.bmt, aldist.bmt, ldist.comm, aldist.is, ldist.is,
        file = file.path(base_dir, 'data', 'catchdistribution_bootstrap_data.Rdata'))
 }else{
-  save(ldist.aut, matp.aut,
+  save(ldist.aut, matp.aut, matp.aut_F,
        ldist.lln, ldist.bmt, aldist.bmt, ldist.comm, aldist.is, ldist.is,
        file = file.path(base_dir, 'data', 'catchdistribution_data.Rdata'))
 }

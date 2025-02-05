@@ -54,6 +54,50 @@ quota <-
     run_f = quote(cur_year >= end_year - 1),
     )
 
+if (timevarying_lln){
+  lln_par <- 
+    list(alpha = 
+           g3_formula(if (cur_year < 2013L)
+             g3_param('bli.lln.alpha.7512')
+             else if (cur_year < 2019L)
+               g3_param("bli.lln.alpha.1318")
+             else
+               g3_param('bli.lln.alpha.7512')),
+         l50 = 
+           g3_formula(if (cur_year < 2013L)
+             g3_param('bli.lln.l50.7512')
+             else if (cur_year < 2019L)
+               g3_param("bli.lln.l50.1318")
+             else
+               g3_param('bli.lln.l50.7512'))
+    )
+}else{
+  lln_par <- list(alpha = g3_formula(g3_param('bli.lln.alpha')),
+                  l50 = g3_formula(g3_param('bli.lln.l50')))
+}
+
+if (timevarying_bmt){
+  bmt_par <- 
+    list(alpha = 
+           g3_formula(if (cur_year < 2011L)
+             g3_param('bli.bmt.alpha.7510')
+             else if (cur_year < 2018L)
+               g3_param("bli.bmt.alpha.1117")
+             else
+               g3_param('bli.bmt.alpha.7510')),
+         l50 = 
+           g3_formula(if (cur_year < 2011L)
+             g3_param('bli.bmt.l50.7510')
+             else if (cur_year < 2018L)
+               g3_param("bli.bmt.l50.1117")
+             else
+               g3_param('bli.bmt.l50.7510'))
+    )
+}else{
+  bmt_par <- list(alpha = g3_formula(g3_param('bli.bmt.alpha')),
+                  l50 = g3_formula(g3_param('bli.bmt.l50')))
+}
+
 
 ## Fleet actions
 fleet_actions <- 
@@ -86,18 +130,8 @@ fleet_actions <-
                                 gadget3::g3_suitability_andersenfleet(
                                   p5 = max(sapply(stocks, g3_stock_def, 'maxmidlen')),
                                   by_stock = stocks)
-                              else  g3_suitability_exponentiall50(
-                                alpha = g3_parameterized('alpha', 
-                                                         by_year = timevarying_lln,
-                                                         by_stock = stocks,
-                                                         by_predator = TRUE,
-                                                         offset = quote(0 * cur_year)),
-                                l50 = g3_parameterized('l50', 
-                                                       by_year = timevarying_lln,
-                                                       by_stock = stocks,
-                                                       by_predator = TRUE,
-                                                       offset = quote(0 * cur_year))
-                                ) 
+                              else  g3_suitability_exponentiall50(alpha = lln_par$alpha,
+                                                                  l50 = lln_par$l50) 
                             },
                             catchability_f = 
                               gadget3:::g3a_predate_catchability_project(
@@ -114,18 +148,8 @@ fleet_actions <-
                                 gadget3::g3_suitability_andersenfleet(
                                   p5 = max(sapply(stocks, g3_stock_def, 'maxmidlen')),
                                   by_stock = stocks)
-                              else  g3_suitability_exponentiall50(
-                                alpha = g3_parameterized('alpha', 
-                                                         by_year = timevarying_bmt,
-                                                         by_stock = stocks, 
-                                                         by_predator = TRUE,
-                                                         offset = quote(0 * cur_year)),
-                                l50 = g3_parameterized('l50', 
-                                                       by_year = timevarying_bmt,
-                                                       by_stock = stocks,
-                                                       by_predator = TRUE,
-                                                       offset = quote(0 * cur_year))
-                                ) 
+                              else  g3_suitability_exponentiall50(alpha = bmt_par$alpha,
+                                                                  l50 = bmt_par$l50)
                             },
                             catchability_f = 
                               gadget3:::g3a_predate_catchability_project(
@@ -149,17 +173,8 @@ fleet_actions <-
                               by_stock = stocks)
                           }else{
                             ## The foreign fleet will share the same longline suitability or, if single_fleet = TRUE, the commercial fleet 
-                            gadget3::g3_suitability_exponentiall50(
-                              gadget3::g3_parameterized(ifelse(single_fleet, 'comm.alpha', 'lln.alpha'), 
-                                                        by_stock = stocks, 
-                                                        by_year = timevarying_lln,
-                                                        by_predator = FALSE,
-                                                        offset = quote(0 * cur_year)),
-                              gadget3::g3_parameterized(ifelse(single_fleet, 'comm.l50', 'lln.l50'), 
-                                                        by_stock = stocks, 
-                                                        by_year = timevarying_lln,
-                                                        by_predator = FALSE,
-                                                        offset = quote(0 * cur_year))) 
+                            gadget3::g3_suitability_exponentiall50(alpha = lln_par$alpha,
+                                                                   l50 = lln_par$l50) 
                             }
                           },
                         catchability_f = 

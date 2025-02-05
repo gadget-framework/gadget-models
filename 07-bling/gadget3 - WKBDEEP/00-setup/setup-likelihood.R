@@ -24,7 +24,7 @@ if(FALSE){
 }
 
 
-
+if (female_maturation) matp.aut <- matp.aut_F
 
 
 nll_breakdown <- TRUE  # Turn to TRUE to get per-step nll
