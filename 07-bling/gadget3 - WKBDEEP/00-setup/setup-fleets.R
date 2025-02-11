@@ -44,6 +44,8 @@ quota <-
     gadget3::g3_quota_hockeyfleet(
       predstocks = fleets,
       preystocks = list(mat_stock),
+      #preyprop_fs = g3_eval(g3_suitability_blueling(), list(stock__midlen = as.vector(g3_stock_def(mat_stock, 'midlen')))),#list(bli_mat = g3_suitability_blueling()),# g3_suitability_blueling(),
+      #preyprop_fs = g3_suitability_blueling(),
       btrigger = g3_parameterized('hf.btrigger', value = 1, optimise = FALSE, by_stock = mat_stock),
       harvest_rate = g3_parameterized('hf.harvest_rate', value = 0, optimise = FALSE, by_stock = fleets)
       ),

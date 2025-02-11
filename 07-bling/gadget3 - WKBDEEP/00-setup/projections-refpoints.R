@@ -7,7 +7,7 @@ library(g3experiments)
 
 
 base_dir <- 'benchmarks/WKBDEEP/gadget3'
-vers <- 'models/20-baseline_IFgr_Linf0_K1_t00_penrec1_sd0.4_agedata0_t0'
+vers <- 'models/26-baseline_IFgr_Linf0_K0_t00_mlgg4_reccv0_penrec1_sd0.4_agedata0_t0_ff'
 outpath <- file.path(base_dir, vers, 'PROJ')
 theme_set(theme_bw())
 
@@ -31,9 +31,16 @@ f_round <- 3
 
 ## Median SSB for 2000:2005 (see TR)
 ## Blim, Bpa, Btrigger
-blim <- round(fit$res.by.year |> filter(stock == 'bli_mat', year == 2001) |> pull(total.biomass)/1e3)
+blim <- 
+  fit$res.by.year |> 
+  filter(stock == 'bli_mat') |> 
+  mutate(total.biomass = total.biomass/1e3) |> 
+  pull(total.biomass) |> 
+  min()
+
 bpa  <- blim * exp(1.645 * 0.2)
 btrigger <- bpa
+
 
 ## Load the data
 load(file.path(outpath, 'results_msy_nobtrigger.Rdata'))
@@ -178,15 +185,15 @@ proj_plot <-
     
     ssb_dat %>% 
       filter(prob==0.5) %>% 
-      ggplot(aes(f, value/1e3)) + 
+      ggplot(aes(f, value)) + 
       geom_ribbon(data = ssb_dat %>%
-                    mutate(value = value/1e3) %>% 
+                    mutate(value = value) %>% 
                     filter(prob %in% c(0.05,0.5,0.95)) %>% 
                     pivot_wider(names_from = prob,values_from = value),
                   aes(y=0.5,ymin = `0.05`, ymax = `0.95`),
                   alpha = 0.5) +
       geom_ribbon(data = ssb_dat %>%
-                    mutate(value = value/1e3) %>%  
+                    mutate(value = value) %>%  
                     filter(prob %in% c(0.25,0.5,0.75)) %>% 
                     pivot_wider(names_from = prob,values_from = value),
                   aes(y=0.5,ymin = `0.25`, ymax = `0.75`),
@@ -246,14 +253,14 @@ ggsave(plot = proj_plot, filename = file.path(outpath, 'simulationplots.png'), u
 fithist <- 
   fit$stock.recruitment %>% 
   mutate(rec = recruitment/1e6) %>% 
-  filter(year >= 1985) %>% 
-  pull(rec) %>% hist(breaks = seq(0, 200, by = 25))
+  filter(year >= 2000) %>% 
+  pull(rec) %>% hist(breaks = seq(0, 11, by = 1))
 
 simhist <- 
   results_msy_nobtrigger %>% 
   filter(year > 2025, hr_target == 0.06) %>% 
   mutate(rec = rec/1e6) %>% 
-  pull(rec) %>% hist(breaks = seq(0, 200, by = 25))
+  pull(rec) %>% hist(breaks = seq(0, 11, by = 1))
 
 recounts <- data.frame(Type = 'Base_fit', c = fithist$counts/sum(fithist$counts), mids = fithist$mids) %>% 
   bind_rows(

@@ -8,23 +8,24 @@ library(mfdb)
 library(gadget3)
 library(gadgetutils)
 library(gadgetplots)
-#library(mar)
-library(tidyverse)
+library(mar)
 #library(g3experiments)
 
 ## Model directory
 base_dir <- 'benchmarks/WKBDEEP/gadget3'
 
+#load("~/DAG/07-bling/sexr.Rdata")
+
 ## Model version
-vers <- 'models/25-variant'
+vers <- 'models/26-baseline'
 #vers <- 'models/07-baseline'
 ## For the baseline model we will fix Linf, estimate k and t0
 ## Some easy options for alternative models
 faroe_growth <- FALSE
-growth_origin <- 'cc'         
+growth_origin <- 'ff'         
 faroe_M <- FALSE
 estimate_linf <- FALSE
-estimate_k <- TRUE
+estimate_k <- FALSE
 estimate_t0 <- FALSE
 estimate_phi <- FALSE
 estimate_reccv <- FALSE
@@ -83,10 +84,10 @@ read_bootstrap_data <- FALSE
 ## Which model diagnostics to run
 run_iterative <- TRUE
 run_retro <- TRUE
-run_bootstrap <- FALSE
-run_mprofile <- FALSE
+run_bootstrap <- TRUE
+run_mprofile <- TRUE
 run_growthprofile <- FALSE
-run_jitter <- FALSE
+run_jitter <- TRUE
 run_leaveout <- FALSE
 
 ## Model dimensions and stock:
@@ -259,6 +260,7 @@ fs::dir_create(file.path(base_dir, c('data', vers)))
 
 ## ------------------------------------------------------------------------------------
 
+source(file.path(base_dir, '00-setup', 'setup-sexratio_suitability.R'))  # Generates fleet_actions
 source(file.path(base_dir, '00-setup', 'setup-stocks.R'))  # Generates stock objects
 
 if (single_stock_model){

@@ -114,12 +114,21 @@ g3p_setup_pars <- function(model,
       ## if the recruitment pattern is not found.
       if (any(grepl(rec_pattern, pars$switch))){
         if (is.null(rec_years)) rec_years <- rec_list[[x$rep]]$year
-        pars <- g3experiments::g3p_project_rec(pars, 
-                                               rec_pattern = rec_pattern,
-                                               recruitment = rec_list[[x$rep]][rec_list[[x$rep]]$year %in% rec_years,],
-                                               method = rec_method,
-                                               scale = rec_scale,
-                                               block_size = rec_block_size) 
+        if (rec_method == 'bootstrap'){
+          pars <- g3experiments::g3p_project_rec(pars, 
+                                                 rec_pattern = rec_pattern,
+                                                 recruitment = rec_list[[x$rep]][rec_list[[x$rep]]$year %in% rec_years,],
+                                                 method = rec_method,
+                                                 scale = rec_scale,
+                                                 block_size = rec_block_size)   
+        }else{
+          pars <- g3experiments::g3p_project_rec(pars, 
+                                                 rec_pattern = rec_pattern,
+                                                 recruitment = rec_list[[x$rep]][rec_list[[x$rep]]$year %in% rec_years,],
+                                                 method = rec_method,
+                                                 scale = rec_scale) 
+        }
+        
       }
       return(pars)
     })
@@ -134,6 +143,7 @@ g3p_run <- function(obj_fun,
                     rec_stock = NULL,
                     rec_step = 1,
                     rec_age = NULL,
+                    sexratio = NULL,
                     ncores = parallel::detectCores()){
   
   
@@ -155,7 +165,8 @@ g3p_process_reports <- function(reports,
                                 f_ages,
                                 rec_stock = NULL,
                                 rec_step = 1,
-                                rec_age = NULL){
+                                rec_age = NULL,
+                                sexratio = NULL){
   
   
   ## ADD timesteps argument or find timesteps from reports (for fbar)
@@ -175,13 +186,40 @@ g3p_process_reports <- function(reports,
   out <- data.frame(year = as.numeric(names(numR)), rec = numR)
   
   ## SSB
-  ssbR <- g3_array_agg(ar = 
-                         reports[grepl(paste0('dstart_', mat_stock, '__num$'), names(reports))][[1]] * 
-                         reports[grepl(paste0('dstart_', mat_stock, '__wgt$'), names(reports))][[1]],
-                       agg = sum,
-                       margins = c('year'),
-                       step = 1)
-  ssbR <- data.frame(year = as.numeric(names(ssbR)), ssb = ssbR)
+  if (FALSE){
+    ssbR <- g3_array_agg(ar = reports[grepl(paste0('dstart_', mat_stock, '__num$'), names(reports))][[1]],
+                         agg = sum,
+                         margins = c('year','age','length'),
+                         step = 1) |> 
+      as.data.frame.table(stringsAsFactors = FALSE) |> 
+      gadgetutils:::split_length() |> 
+      mutate(length = (ifelse(is.infinite(upper),lower + 4, upper) + lower )/2) |> 
+      left_join(sexratio, by = 'length') |> 
+      mutate(n = Freq*prop, year = as.integer(year)) |> 
+      select(length, age, year, n) |> 
+      left_join(
+        reports[grepl(paste0('dstart_', mat_stock, '__wgt$'), names(reports))][[1]] |> 
+          as.data.frame.table(stringsAsFactors = FALSE) |> 
+          gadgetutils::extract_year_step() |> 
+          gadgetutils:::split_length() |> 
+          mutate(length = (ifelse(is.infinite(upper),lower + 4, upper) + lower )/2) |> 
+          filter(step == 1) |> 
+          select(length, age, year, wgt = Freq)
+      ) |> 
+      mutate(ssb = n*wgt) |> 
+      group_by(year) |> summarise(ssb = sum(ssb))
+    
+  }else{
+    ssbR <- g3_array_agg(ar =
+                           reports[grepl(paste0('dstart_', mat_stock, '__num$'), names(reports))][[1]] *
+                           reports[grepl(paste0('dstart_', mat_stock, '__wgt$'), names(reports))][[1]],
+                         agg = sum,
+                         margins = c('year'),
+                         step = 1)
+    ssbR <- data.frame(year = as.numeric(names(ssbR)), ssb = ssbR)
+    
+  }
+           
   out <- merge(out, ssbR, by = 'year')
   
   ## Catches

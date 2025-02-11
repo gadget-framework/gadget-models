@@ -4,7 +4,13 @@
 
 
 ## Blim, Bpa, Btrigger
-blim <- round(fit$res.by.year |> filter(stock == 'bli_mat', year == 2001) |> pull(total.biomass)/1e3)
+blim <- 
+  fit$res.by.year |> 
+  filter(stock == 'bli_mat') |> 
+  mutate(total.biomass = total.biomass/1e3) |> 
+  pull(total.biomass) |> 
+  min()
+
 bpa  <- blim * exp(1.645 * 0.2)
 btrigger <- bpa
 
@@ -43,7 +49,8 @@ projpar_pre <- g3p_setup_pars(tmb_model, param_list,
                               blim*1e3, btrigger = 1,
                               harvest_rates, hr_trials,
                               fleet_props,
-                              rec_list, rec_years = rec_years)
+                              rec_list, rec_years = rec_years,
+                              rec_method = 'bootstrap', rec_block_size = block_size)
 
 # projpar_pre[[1]] <- g3p_project_rec(projpar_pre[[1]],
 #                                     fit$stock.recruitment |>
@@ -53,27 +60,35 @@ projpar_pre <- g3p_setup_pars(tmb_model, param_list,
 
 ## Objective function
 of <- g3_tmb_adfun(tmb_model, projpar_pre[[1]])
+model <- g3_to_r(attr(tmb_model, 'actions'))
 
-# model <- g3_to_r(attr(tmb_model, 'actions'))
-# reports <- of$report(g3_tmb_par(projpar_pre[[1]]))
+#reports <- of$report(g3_tmb_par(projpar_pre[[1]]))
 # reports2 <- of$report(g3_tmb_par(projpar_pre2[[1]]))
 # reports3 <- of$report(g3_tmb_par(projpar_pre3[[1]]))
 # model <- g3_to_r(attr(tmb_model, 'actions'))
 # 
-# (reports$dstart_bli_mat__num*reports$dstart_bli_mat__wgt) |> 
-#   as.data.frame.table() |> 
-#   gadgetutils::extract_year_step() |> 
-#   group_by(year) |> 
-#   summarise(b = sum(Freq)) |> 
-#   mutate(b = b/1e6) |> 
+# (reports$dstart_bli_mat__num*reports$dstart_bli_mat__wgt) |>
+#   as.data.frame.table() |>
+#   gadgetutils::extract_year_step() |>
+#   group_by(year) |>
+#   summarise(b = sum(Freq)) |>
+#   mutate(b = b/1e6) |>
 #   ggplot(aes(year, b)) + geom_line()
 # 
-# (reports$dstart_bli_dummy__num) |> 
-#   as.data.frame.table() |> 
-#   gadgetutils::extract_year_step() |> 
-#   group_by(year) |> 
-#   summarise(b = sum(Freq)) |> 
-#   mutate(b = b) |> 
+# (reports$dstart_bli_dummy__num) |>
+#   as.data.frame.table() |>
+#   gadgetutils::extract_year_step() |>
+#   group_by(year) |>
+#   summarise(b = sum(Freq)) |>
+#   mutate(b = b) |>
+#   ggplot(aes(year, b)) + geom_line()
+# 
+# (reports$detail_bli_imm__renewalnum) |>
+#   as.data.frame.table() |>
+#   gadgetutils::extract_year_step() |>
+#   group_by(year) |>
+#   summarise(b = sum(Freq)) |>
+#   mutate(b = b) |>
 #   ggplot(aes(year, b)) + geom_line()
 
 print('Running precautionary rp projections')
@@ -97,7 +112,8 @@ projpar_msy_nobtrigger <- g3p_setup_pars(tmb_model, param_list,
                                          harvest_rates, hr_trials,
                                          fleet_props,
                                          rec_list, rec_years = rec_years,
-                                         assess_err = TRUE)
+                                         assess_err = TRUE,
+                                         rec_method = 'bootstrap', rec_block_size = block_size)
 
 print('Running msy rp projections')
 
@@ -120,7 +136,8 @@ projpar_msy <- g3p_setup_pars(tmb_model, param_list,
                               harvest_rates, hr_trials,
                               fleet_props,
                               rec_list, rec_years = rec_years,
-                              assess_err = TRUE)
+                              assess_err = TRUE,
+                              rec_method = 'bootstrap', rec_block_size = block_size)
 
 print('Running msy rp with btrigger projections')
 

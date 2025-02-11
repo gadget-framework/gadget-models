@@ -138,6 +138,7 @@ mat_actions <-
       if (recruitment_free_pars){
         ## SPAWNING - for projections
         g3a_spawn(
+          proportion_f = g3_suitability_blueling(),
           stock = mat_stock,
           recruitment_f =
             g3a_spawn_recruitment_hockeystick(
