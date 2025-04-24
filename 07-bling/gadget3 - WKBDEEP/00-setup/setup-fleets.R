@@ -51,7 +51,6 @@ quota <-
       ),
     year_length = 1L,
     start_step = 3L,
-    init_val = 0,
     run_revstep = -2,
     run_f = quote(cur_year >= end_year - 1),
     )
