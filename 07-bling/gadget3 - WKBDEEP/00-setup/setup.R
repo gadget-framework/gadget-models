@@ -8,6 +8,7 @@ library(mfdb)
 library(gadget3)
 library(gadgetutils)
 library(gadgetplots)
+library(tidyverse)
 #library(g3experiments)
 
 ## Model directory
