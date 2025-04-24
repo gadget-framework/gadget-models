@@ -11,7 +11,7 @@ library(gadgetplots)
 #library(g3experiments)
 
 ## Model directory
-base_dir <- 'benchmarks/WKBDEEP/gadget3'
+base_dir <- '07-bling/gadget3 - WKBDEEP'
 
 #load("~/DAG/07-bling/sexr.Rdata")
 
