@@ -115,6 +115,7 @@ aldist.bmt <-
                                                   open_ended = c("upper","lower"))),
                       defaults))
 
+library(mar)
 mar <- connect_mar()
 
 ldist.is <-

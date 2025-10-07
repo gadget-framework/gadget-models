@@ -54,6 +54,7 @@ init.sigma <-
   dplyr::group_by(age) %>% 
   dplyr::summarise(ml=mean(length,na.rm=TRUE),ms=sd(length,na.rm=TRUE), n=length(na.exclude(length)))
 
+library(mar)
 mar <- connect_mar()
 init.cv <- 
   les_syni(mar) |>
