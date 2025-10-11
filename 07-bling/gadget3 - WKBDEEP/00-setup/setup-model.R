@@ -163,7 +163,6 @@ mat_actions <-
         )
       }else{
         ## SPAWNING - for projections
-        c(
           g3a_spawn(stock = mat_stock,
                     recruitment_f =
                       g3a_spawn_recruitment_hockeystick(
@@ -183,10 +182,7 @@ mat_actions <-
                                           a = g3_parameterized('recl', by_stock = stocks),
                                           b = g3_parameterized('recl.cv', by_stock = stocks)),
                     run_f = g3_formula(cur_step == 1 && cur_year > start_year)
-                    ),
-          ## NB: Dummy parameter so model will compile in TMB
-          quote( nll <- nll + g3_param("x", value = 0, optimise = FALSE))
-        )
+                    )
       }
     },
     list()
