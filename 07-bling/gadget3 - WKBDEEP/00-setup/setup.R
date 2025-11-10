@@ -17,7 +17,7 @@ base_dir <- '07-bling/gadget3 - WKBDEEP'
 #load("~/DAG/07-bling/sexr.Rdata")
 
 ## Model version
-vers <- 'models/26-baseline'
+vers <- 'models/TEST'
 #vers <- 'models/07-baseline'
 ## For the baseline model we will fix Linf, estimate k and t0
 ## Some easy options for alternative models
@@ -84,8 +84,8 @@ read_bootstrap_data <- FALSE
 ## Which model diagnostics to run
 run_iterative <- TRUE
 run_retro <- TRUE
-run_bootstrap <- TRUE
-run_mprofile <- TRUE
+run_bootstrap <- FALSE                  
+run_mprofile <- FALSE
 run_growthprofile <- FALSE
 run_jitter <- TRUE
 run_leaveout <- FALSE
@@ -170,7 +170,7 @@ number_of_peels <- 6
 
 ## Bootstrap options:
 boot_folder <- 'BOOTSTRAP'                # Bootstrap results will be written to file.path(base_dir, vers, boot_folder)
-nboots <- 100                           # Number of bootstrap replicates
+nboots <- 1                              # Number of bootstrap replicates
 boot_short <- TRUE                      # If FALSE, iterative re-weighting will be performed. If TRUE, weights will be read in from 'wgts_folder'
 bootstrap_cores <- 35
 
@@ -458,7 +458,7 @@ if (FALSE){
   ## Fit
   fit <- g3_fit(g3_to_r(attr(modcpp, 'actions')), newpars)
   save(fit, file = file.path(base_dir, vers, 'fit.Rdata'))
-  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', template = 'iceland_bling')
+  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html')
   
 }
   
@@ -522,7 +522,7 @@ if (run_iterative){
   ## Get the model fit
   fit <- g3_fit(model, params.out |> g3_init_guess('project_years', 1))
   save(fit, file = file.path(base_dir, vers, 'WGTS/fit.Rdata'))
-  #gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', template = 'iceland_bling')
+  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html')
   
   sdout <- TMB::sdreport(obj.fun, g3_tmb_par(params.out))
   save(sdout, file = file.path(base_dir, vers, 'WGTS/sdout.Rdata'))
@@ -589,7 +589,7 @@ if (run_retro){
   #                   params.out,
   #                   num.years = 10)
   
-  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', retro_fit = retro_fit, template = 'iceland_bling')
+  #gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', retro_fit = retro_fit, template = 'iceland_bling')
   
   cat("------------- Retro complete -------------\n\n")
 }
@@ -866,12 +866,12 @@ if (run_bootstrap){
                                       params = boot_run[[x]] |> g3_init_guess('project_years',1))))
   
   save(boot_fit, file = file.path(base_dir, vers, boot_folder, 'boot_fit.Rdata'))     
-  gadget_plots(fit, 
-               file.path(base_dir, vers, 'figs2'), 
-               file_type = 'html', 
-               retro_fit = retro_fit, 
-               boot_fit = boot_fit,
-               template = 'iceland_bling')
+  # gadget_plots(fit, 
+  #              file.path(base_dir, vers, 'figs2'), 
+  #              file_type = 'html', 
+  #              retro_fit = retro_fit, 
+  #              boot_fit = boot_fit,
+  #              template = 'iceland_bling')
   
   
 }
