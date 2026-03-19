@@ -54,7 +54,6 @@ init.sigma <-
   dplyr::group_by(age) %>% 
   dplyr::summarise(ml=mean(length,na.rm=TRUE),ms=sd(length,na.rm=TRUE), n=length(na.exclude(length)))
 
-library(mar)
 mar <- connect_mar()
 init.cv <- 
   les_syni(mar) |>
@@ -124,7 +123,8 @@ aldat <-
 
 vonB.par <- nls(length~Linf*(1-exp(-K*(age-t0))), 
                 data=aldat, 
-                start=list(Linf=125, K=0.15, t0=-1))
+                start=list(Linf=120, K=0.15, t0=-1),
+                control = nls.control(maxiter = 1000))
 #confint(cas.vonB.par)
 
 plot(aldat$age, aldat$length, ylim = c(0,140), xlim = c(0,20))

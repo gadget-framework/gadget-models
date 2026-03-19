@@ -22,119 +22,6 @@ plot_stockrecruit <- function(fit, mat, imm, recruitment_age){
                           min()/1e6, lty = 'dashed')  
 }
 
-g3p_setup_pars <- function(model, 
-                           params, 
-                           blim,
-                           btrigger,
-                           harvest_rates,
-                           harvest_rate_trials,
-                           fleet_proportions,
-                           rec_list,
-                           rec_years = NULL,
-                           rec_scale = 1e-04,
-                           rec_block_size = 7,
-                           rec_method = 'bootstrap',
-                           project_years = 100,
-                           assess_err = FALSE,
-                           advice_rho = 0.423,
-                           advice_cv = 0.212,
-                           blim_pattern = 'spawn_blim',
-                           btrigger_pattern  = '*.hf.btrigger',
-                           rec_pattern = 'project_rec.[0-9]',
-                           hr_pattern = '*.hf.harvest_rate',
-                           quota_prop_pattern = '*.quota.prop'){
-  
-  ## Check model
-  if ('g3_r' %in% class(model)) model <- g3_to_tmb(attr(model, 'actions'))
-  if (!('g3_cpp' %in% class(model))) stop("The 'model' argument should be a g3 model of class 'g3_r' or 'g3_cpp'")
-  
-  ## Turn optimise to TRUE for parameters we'll be changing, ie, btrigger,
-  ## projected recruits and harvest rates, ensures g3_tmb_par() gets what we need
-  base_par <- attr(model, 'parameter_template')
-  
-  ## Fleet proportions
-  all_fleet_switches <- base_par[grepl(quota_prop_pattern, base_par$switch), 'switch']
-  fleet_proportions$fleet <- paste0(fleet_proportions$fleet, gsub('\\*', '', quota_prop_pattern))
-  if (!all(all_fleet_switches %in% fleet_proportions$fleet)){
-    fleet_proportions <- rbind(fleet_proportions, 
-                               expand.grid(fleet = all_fleet_switches[!(all_fleet_switches %in% fleet_proportions$fleet)],
-                                           prop = 0))
-  }
-  if (sum(fleet_proportions$prop) != 1){
-    warning('Scaling fleet proportions to sum to 1')
-    fleet_proportions$prop <- fleet_proportions$prop/sum(fleet_proportions$prop)
-  }
-  
-  ## BASE PARAMETERS FINISHED
-  ## ONTO VARIANTS: recruitment, btrigger and harvest rates
-  
-  ## Check params, turn into list if its a data.frame
-  if (is.data.frame(params))  params <- list('base' = params)
-  if (!all(names(params[[1]]) %in% names(base_par))) stop("The 'params' argument should be a g3 parameter data.frame or list of g3 parameter data.frames")
-  
-  ## The setup:
-  ## We will simulate the model with each harvest rate (harvest_rates argument)
-  ## n number of times, where n = harvest_rate_trials. If assess_err = TRUE,
-  ## each replicate will have a unique recruitment series and harvest rate, 
-  ## if assess_err = FALSE, each replicate will have a unique recritment series.
-  ## This will be setup for each of the input parameters (argument 'params')
-  
-  simdf <- expand.grid(hr = harvest_rates,
-                       rep = 1:length(params),
-                       trial = 1:harvest_rate_trials)
-  simdf$id <- paste('h', simdf$hr, simdf$trial, simdf$rep, sep = '-')
-  
-  ## Loop over simdf to create list of input parameters
-  out <- 
-    lapply(split(simdf, simdf$id), function(x){
-      ## Take values from estimated pars
-      pars <- base_par
-      pars$value[params[[x$rep]]$switch] <- params[[x$rep]]$value
-      ## Ensure all estimated pars plus harvest rates, projected recruitments
-      ## and btrigger are optimise = TRUE. 
-      pars$optimise <- params[[x$rep]]$optimise[match(pars$switch, params[[x$rep]]$switch)]
-      pars[grepl(paste(btrigger_pattern, 
-                       rec_pattern, 
-                       hr_pattern, 
-                       sep = '|'), base_par$switch), 'optimise'] <- TRUE
-    
-      pars <-  
-        g3_init_val(pars, btrigger_pattern, btrigger, optimise = TRUE) |> 
-        g3_init_val(blim_pattern, blim, optimise = TRUE) |> 
-        g3_init_val('project_years', project_years, optimise = FALSE) |> 
-        g3experiments::g3p_project_advice_error(hr_pattern = hr_pattern,
-                                                hr_target = x$hr,
-                                                advice_rho = advice_rho,
-                                                advice_cv = ifelse(assess_err, advice_cv, 0))
-      
-      ## Merge fleet proportions into base parameters
-      pars[match(fleet_proportions$fleet, pars$switch),'value'] <- fleet_proportions$prop
-      
-      ## Projected recruitment may come from a random walk which we will assume 
-      ## if the recruitment pattern is not found.
-      if (any(grepl(rec_pattern, pars$switch))){
-        if (is.null(rec_years)) rec_years <- rec_list[[x$rep]]$year
-        if (rec_method == 'bootstrap'){
-          pars <- g3experiments::g3p_project_rec(pars, 
-                                                 rec_pattern = rec_pattern,
-                                                 recruitment = rec_list[[x$rep]][rec_list[[x$rep]]$year %in% rec_years,],
-                                                 method = rec_method,
-                                                 scale = rec_scale,
-                                                 block_size = rec_block_size)   
-        }else{
-          pars <- g3experiments::g3p_project_rec(pars, 
-                                                 rec_pattern = rec_pattern,
-                                                 recruitment = rec_list[[x$rep]][rec_list[[x$rep]]$year %in% rec_years,],
-                                                 method = rec_method,
-                                                 scale = rec_scale) 
-        }
-        
-      }
-      return(pars)
-    })
-  return(out)
-}
-
 g3p_run <- function(obj_fun,
                     params, 
                     mat_stock,
@@ -152,7 +39,7 @@ g3p_run <- function(obj_fun,
     reports <- obj_fun$report(g3_tmb_par(params[[x]]))
     ## Process reports
     res <- g3p_process_reports(reports, mat_stock, imm_stock, f_ages, rec_stock,
-                               rec_step, rec_age)
+                               rec_step, rec_age, sexratio = sexratio)
     res$id <- x
     return(res)
   }, mc.cores = ncores)
@@ -174,7 +61,7 @@ g3p_process_reports <- function(reports,
   ## HR option
   ## Better way of dealing with stocks
   
-  
+  if (length(f_ages) == 2) f_ages <- f_ages[1]:f_ages[2]
   if (is.null(rec_stock)) rec_stock <- imm_stock
   
   ## Recruitment
@@ -183,10 +70,18 @@ g3p_process_reports <- function(reports,
                        margins = c('year'),
                        step = (rec_step + 1),
                        age = rec_age)
-  out <- data.frame(year = as.numeric(names(numR)), rec = numR)
+  out <- data.frame(year = as.numeric(names(numR)), rec5 = numR)
+  
+  numR0 <- g3_array_agg(ar = reports[grepl(paste0('dstart_', rec_stock, '__num$'), names(reports))][[1]],
+                        agg = sum,
+                        margins = c('year'),
+                        step = (rec_step + 1),
+                        age = 2)
+  out <- merge(out, data.frame(year = as.numeric(names(numR0)), rec = numR0), by = 'year')
   
   ## SSB
-  if (FALSE){
+  if (TRUE){
+    
     ssbR <- g3_array_agg(ar = reports[grepl(paste0('dstart_', mat_stock, '__num$'), names(reports))][[1]],
                          agg = sum,
                          margins = c('year','age','length'),
@@ -205,7 +100,7 @@ g3p_process_reports <- function(reports,
           mutate(length = (ifelse(is.infinite(upper),lower + 4, upper) + lower )/2) |> 
           filter(step == 1) |> 
           select(length, age, year, wgt = Freq)
-      ) |> 
+        , by = c('length', 'age', 'year')) |> 
       mutate(ssb = n*wgt) |> 
       group_by(year) |> summarise(ssb = sum(ssb))
     
@@ -219,7 +114,7 @@ g3p_process_reports <- function(reports,
     ssbR <- data.frame(year = as.numeric(names(ssbR)), ssb = ssbR)
     
   }
-           
+  
   out <- merge(out, ssbR, by = 'year')
   
   ## Catches
@@ -251,7 +146,7 @@ g3p_process_reports <- function(reports,
       g3_array_agg(ar = imm_ar, agg = sum, margins = c('year', 'step', 'age')),
       g3_array_agg(ar = mat_ar, agg = sum, margins = c('year', 'step', 'age'))   
     ))
-    
+  
   ## Stock numbers
   N0 <- 
     g3_array_combine(list(
@@ -260,16 +155,21 @@ g3p_process_reports <- function(reports,
     ))
   
   ## Fbar
-  fbar <- 4*(-log(1 - catN[paste0('age', f_ages),,]/N0[paste0('age', f_ages),,]))
+  fbar <- 4*(-log(1 - 
+                    apply(catN[paste0('age', f_ages),,],2:3,sum)/
+                    apply(N0[paste0('age', f_ages),,],2:3,sum)))
   fbar[is.na(fbar)] <- 0
+  
+  
   if ('age' %in% names(dim(fbar))) fbar <- apply(fbar, MARGIN = 3, FUN = mean)
   else fbar <- apply(fbar, MARGIN = 2, FUN = mean)
-
+  
   fbar <- data.frame(year = as.numeric(names(fbar)), fbar = fbar)
   
   return(merge(out, fbar, by = 'year'))
   
 }
+
 
 ## OLD VERSION
 run_proj <- function(adfun, pars){

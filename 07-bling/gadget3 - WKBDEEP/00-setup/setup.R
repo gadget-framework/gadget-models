@@ -1,6 +1,6 @@
 ## -----------------------------------------------------------------------------
 ##
-## Runner to build a Gadget3 model for Blue Ling 
+## Assessment model for blue ling in 5a and 14
 ##
 ## -----------------------------------------------------------------------------
 
@@ -8,17 +8,52 @@ library(mfdb)
 library(gadget3)
 library(gadgetutils)
 library(gadgetplots)
-library(tidyverse)
+library(mar)
 #library(g3experiments)
 
-## Model directory
-base_dir <- '07-bling/gadget3 - WKBDEEP'
+## Model directory and version
+base_dir <- 'assessment_model'
+vers <- file.path('model', paste0('nwwg_', lubridate::year(Sys.Date())))
 
-#load("~/DAG/07-bling/sexr.Rdata")
+## Time and stock:
+year_range <- 1975:(lubridate::year(Sys.Date())-1)
+species_name <- 'bli' 
 
-## Model version
-vers <- 'models/TEST'
-#vers <- 'models/07-baseline'
+## Whether or not to call the setup-data scripts
+read_data <- FALSE
+read_bootstrap_data <- FALSE
+
+## Which model diagnostics to run
+run_iterative <- TRUE
+run_retro <- TRUE
+run_bootstrap <- TRUE
+run_mprofile <- FALSE
+run_growthprofile <- FALSE
+run_jitter <- TRUE
+run_leaveout <- FALSE
+
+## Other options:
+wgts_folder <- 'WGTS'
+
+## Retro options:
+retro_folder <- 'RETRO'
+number_of_peels <- 6
+
+## Bootstrap options:
+boot_folder <- 'BOOTSTRAP'                # Bootstrap results will be written to file.path(base_dir, vers, boot_folder)
+nboots <- 100                           # Number of bootstrap replicates
+boot_short <- TRUE                      # If FALSE, iterative re-weighting will be performed. If TRUE, weights will be read in from 'wgts_folder'
+bootstrap_cores <- 35
+
+## Optimisation control:
+# Control list for stats::optim
+optim_control <- list(maxit = 2000, reltol = 1e-10) 
+
+
+################################################################################
+################################################################################
+################################################################################
+
 ## For the baseline model we will fix Linf, estimate k and t0
 ## Some easy options for alternative models
 faroe_growth <- FALSE
@@ -32,11 +67,6 @@ estimate_reccv <- FALSE
 fix_bbin <- FALSE
 bbin_start <- 500
 bbin_upper <- 1000
-
-
-
-#fixed_growth_pars <- list(linf = 125, k = 0.152, t0 = 1.552)
-#fixed_growth_pars <- list(linf = 125, k = 0.152, t0 = 1.552)
 
 ## Combining data from Faroes, with commercial and survey samples from IS
 if (faroe_growth){ 
@@ -65,6 +95,7 @@ recruitment_sigma <- 0.4            # Only relevant if penalise recruitment = 1
 recruitment_std <- 0.2                # Only relevant if penalise recruitment = 0
 arima_phi <- 0
 naturalmortality <- ifelse(faroe_M, 0.11, 0.15)
+project_years <- 10
 
 # Composition data - 
 bmt_age <- FALSE             # whether to include the commercial trawl age readings
@@ -72,28 +103,6 @@ bmt_age_stratified <- TRUE       # If including commercial age readings, should 
 iter_group_BMTAGE <- FALSE
 
 stratified_indices <- TRUE
-
-## -----------------------------------------------------------------------------
-## OPTIONS 
-## -----------------------------------------------------------------------------
-
-## Whether or not to call the setup-data scripts
-read_data <- FALSE
-read_bootstrap_data <- FALSE
-
-## Which model diagnostics to run
-run_iterative <- TRUE
-run_retro <- TRUE
-run_bootstrap <- FALSE                  
-run_mprofile <- FALSE
-run_growthprofile <- FALSE
-run_jitter <- TRUE
-run_leaveout <- FALSE
-
-## Model dimensions and stock:
-year_range <- 1975:2023 #(lubridate::year(Sys.Date())-1)
-project_years <- 100
-species_name <- 'bli' 
 
 ## Stock options:
 single_stock_model <- FALSE
@@ -135,7 +144,6 @@ si_cv <- 0.2
 
 ## DIAGNOSTICS
 ## Iterative re-weighting:
-wgts_folder <- 'WGTS'
 cv_floor <- 0
 iter_group_SI <- TRUE         # whether or not to group all SI's together for optimisation
 iter_group_AUT <- FALSE        # group together autumn likelihood components
@@ -164,19 +172,6 @@ gw_values <-
   expand.grid(K = seq(0.06, 0.20, by = 0.02),
               Linf = seq(90, 150, by = 10))
 
-## Retro options:
-retro_folder <- 'RETRO'
-number_of_peels <- 6
-
-## Bootstrap options:
-boot_folder <- 'BOOTSTRAP'                # Bootstrap results will be written to file.path(base_dir, vers, boot_folder)
-nboots <- 1                              # Number of bootstrap replicates
-boot_short <- TRUE                      # If FALSE, iterative re-weighting will be performed. If TRUE, weights will be read in from 'wgts_folder'
-bootstrap_cores <- 35
-
-## Optimisation control:
-# Control list for stats::optim
-optim_control <- list(maxit = 2000, reltol = 1e-10) 
 
 if (FALSE){
   ## RANDOM EFFECTS:
@@ -203,29 +198,29 @@ peel <- 0
 #if (!bmt_age) year_range <- year_range[year_range >= 1978]
 M_values <- rep(M_values, each = profile_reps)
 ## Create suffix for model
-vers <- paste0(vers, 
-               {if (faroe_growth) '_Fgr' else '_IFgr'},
-               {if (faroe_M) '_FarM' else NULL},
-               '_Linf', as.numeric(estimate_linf),
-               '_K', as.numeric(estimate_k),
-               '_t0', as.numeric(estimate_t0),
-               '_mlgg', maxlengthgroupgrowth,
-               {if (!estimate_reccv) '_reccv0' else NULL},
-               {if (recruitment_free_pars) paste0('_penrec', penalise_recruitment) else NULL},
-               {if (recruitment_free_pars && penalise_recruitment == 1) paste0('_sd', recruitment_sigma) else NULL},
-               {if (!recruitment_free_pars) paste0('_sd', recruitment_std) else NULL},
-               {if (!recruitment_free_pars) paste0('_ar', arima_phi) else NULL},
-               '_agedata', as.numeric(bmt_age),
-               {if (dome_bmt) '_bmtAnd' else NULL},
-               {if (timevarying_bmt) '_bmtTV' else NULL},
-               {if (dome_lln) '_llnAnd' else NULL},
-               {if (timevarying_lln) '_llnTV' else NULL},
-               {if (!mean_len_recl) '_t0' else NULL},
-               {if (!is.null(si_len_slopes)) '_sislope' else NULL},
-               {if (!iter_group_SI) '_aut2gp' else NULL},
-               {if (female_maturation) '_Fmat' else NULL},
-               {if (female_weight_length) '_Fwl' else NULL},
-               paste0('_', growth_origin))
+# vers <- paste0(vers, 
+#                {if (faroe_growth) '_Fgr' else '_IFgr'},
+#                {if (faroe_M) '_FarM' else NULL},
+#                '_Linf', as.numeric(estimate_linf),
+#                '_K', as.numeric(estimate_k),
+#                '_t0', as.numeric(estimate_t0),
+#                '_mlgg', maxlengthgroupgrowth,
+#                {if (!estimate_reccv) '_reccv0' else NULL},
+#                {if (recruitment_free_pars) paste0('_penrec', penalise_recruitment) else NULL},
+#                {if (recruitment_free_pars && penalise_recruitment == 1) paste0('_sd', recruitment_sigma) else NULL},
+#                {if (!recruitment_free_pars) paste0('_sd', recruitment_std) else NULL},
+#                {if (!recruitment_free_pars) paste0('_ar', arima_phi) else NULL},
+#                '_agedata', as.numeric(bmt_age),
+#                {if (dome_bmt) '_bmtAnd' else NULL},
+#                {if (timevarying_bmt) '_bmtTV' else NULL},
+#                {if (dome_lln) '_llnAnd' else NULL},
+#                {if (timevarying_lln) '_llnTV' else NULL},
+#                {if (!mean_len_recl) '_t0' else NULL},
+#                {if (!is.null(si_len_slopes)) '_sislope' else NULL},
+#                {if (!iter_group_SI) '_aut2gp' else NULL},
+#                {if (female_maturation) '_Fmat' else NULL},
+#                {if (female_weight_length) '_Fwl' else NULL},
+#                paste0('_', growth_origin))
 
 ## -----------------------------------------------------------------------------
 
@@ -257,6 +252,8 @@ time_actions <- list(
 
 ## Data and model folders
 fs::dir_create(file.path(base_dir, c('data', vers)))
+## Save defaults and areas
+save(defaults, areas, file = file.path(base_dir, vers, 'defaults.Rdata'))
 
 ## ------------------------------------------------------------------------------------
 
@@ -325,8 +322,8 @@ tmb_param <-
   ## Recruitment and initial conditions
   g3_init_val('*.rec.#', 50, lower = 0.001, upper = 100) |> # ifelse(random_recruitment, penalise_recruitment, 1)) |> 
   g3_init_val('*.init.#', 50, lower = 0.001, upper = 100) |> #ifelse(random_initial, penalise_initial, 1)) |> 
-  g3_init_val('*.rec.scalar', 25, spread = 0.99) |> 
-  g3_init_val('*.init.scalar', 25, spread = 0.99) |>
+  g3_init_val('*.rec.scalar', 50, spread = 0.99) |> 
+  g3_init_val('*.init.scalar', 50, spread = 0.99) |>
   g3_init_val('*.init.F', 
                        ifelse((!initabun_by_age && !initabun_by_stock), 0.2, 0), 
                        spread = {if (!initabun_by_age && !initabun_by_stock) 0.75 else NULL}) |> 
@@ -400,7 +397,7 @@ if (timevarying_K) tmb_param <- g3_init_guess(tmb_param, '\\.K', 0.12, 0.1, 0.14
 ## Run the R-model
 result <- model(tmb_param$value)
 result[[1]]
-#gadgetplots::gadget_plots(g3_fit(model, tmb_param), file_type = 'html', path = 'tmp2', template = 'iceland_bling')
+gadgetplots::gadget_plots(g3_fit(model, tmb_param), file_type = 'html', path = 'TEST')
 
 # List all available reports
 print(names(attributes(result)))
@@ -458,7 +455,7 @@ if (FALSE){
   ## Fit
   fit <- g3_fit(g3_to_r(attr(modcpp, 'actions')), newpars)
   save(fit, file = file.path(base_dir, vers, 'fit.Rdata'))
-  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html')
+  gadget_plots(fit, file.path(base_dir, vers, 'figs'), file_type = 'html', template = 'iceland_bling')
   
 }
   
@@ -777,7 +774,7 @@ if (run_growthprofile){
 
 if(read_bootstrap_data){
   
-  load(file = 'benchmarks/WKBDEEP/gadget3/data/nodata_divs.Rdata')
+  load(file = 'assessment_model/data/nodata_divs.Rdata')
   
   ## Get new divisions
   newreits <- 

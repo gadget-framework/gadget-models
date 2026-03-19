@@ -31,7 +31,7 @@ bmt_landings_tmp <- mfdb_sample_totalweight(mdb, NULL, c(list(
 if (TRUE){
   ## Area 14
   gn_landings <- 
-    read_csv("benchmarks/WKBDEEP/data/greenland/logbooks_00-23.csv") |> 
+    read_csv("data/greenland/logbooks_00-23.csv") |> 
     filter(code == 'BLI',
            area %in% c('ices14a', 'ices14b')) |> 
     mutate(month = month(time1),
@@ -74,9 +74,9 @@ bmt_landings[[1]] <-
 foreign_landings <-
   mfdb_sample_totalweight(mdb, NULL,
                           c(list(
-                            sampling_type = 'FLND',
-                            data_source = c('lods.foreign.landings','statlant.foreign.landings'),
-                            species = defaults$species),
+                            sampling_type = 'FLND'),
+                            #data_source = c('lods.foreign.landings','statlant.foreign.landings')),
+                            #species = defaults$species),
                             defaults))
 
 ## For single fleet option:

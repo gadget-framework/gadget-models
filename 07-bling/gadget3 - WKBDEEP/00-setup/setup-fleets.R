@@ -39,21 +39,45 @@ if (single_fleet) fleets <- list(comm, foreign) else fleets <- list(bmt, lln, fo
 
 ## ------------------------------------------------------------------------------
 
-quota <-
+quotafunction <- function(x){
   gadget3::g3_quota(
     gadget3::g3_quota_hockeyfleet(
-      predstocks = fleets,
+      predstocks = x,
       preystocks = list(mat_stock),
-      #preyprop_fs = g3_eval(g3_suitability_blueling(), list(stock__midlen = as.vector(g3_stock_def(mat_stock, 'midlen')))),#list(bli_mat = g3_suitability_blueling()),# g3_suitability_blueling(),
-      #preyprop_fs = g3_suitability_blueling(),
+      preyprop_fs = g3_suitability_blueling(),
       btrigger = g3_parameterized('hf.btrigger', value = 1, optimise = FALSE, by_stock = mat_stock),
-      harvest_rate = g3_parameterized('hf.harvest_rate', value = 0, optimise = FALSE, by_stock = fleets)
-      ),
+      harvest_rate = gadget3:::f_substitute(~g3_param_table('project_hr',
+                                                            expand.grid(cur_year = seq(end_year+1, 
+                                                                                       end_year+py)), 
+                                                            ifmissing = 0,
+                                                            optimise = FALSE,
+                                                            value = 0),
+                                            list(py = defaults$project_years))
+    ),
     year_length = 1L,
-    start_step = 3L,
-    run_revstep = -2,
-    run_f = quote(cur_year >= end_year - 1),
-    )
+    start_step = 4L,
+    run_revstep = -3,
+    run_f = quote(cur_year > end_year),
+  )
+}
+
+
+# quota <-
+#   gadget3::g3_quota(
+#     gadget3::g3_quota_hockeyfleet(
+#       predstocks = fleets,
+#       preystocks = list(mat_stock),
+#       #preyprop_fs = g3_eval(g3_suitability_blueling(), list(stock__midlen = as.vector(g3_stock_def(mat_stock, 'midlen')))),#list(bli_mat = g3_suitability_blueling()),# g3_suitability_blueling(),
+#       preyprop_fs = g3_suitability_blueling(),
+#       btrigger = g3_parameterized('hf.btrigger', value = 1, optimise = FALSE, by_stock = mat_stock),
+#       harvest_rate = g3_parameterized('hf.harvest_rate', value = 0, optimise = FALSE, by_stock = fleets)
+#       ),
+#     year_length = 1L,
+#     start_step = 3L,
+#     init_val = 0,
+#     run_revstep = -2,
+#     run_f = quote(cur_year >= end_year - 1),
+#     )
 
 if (timevarying_lln){
   lln_par <- 
@@ -117,9 +141,9 @@ fleet_actions <-
                             gadget3:::g3a_predate_catchability_project(
                               quota_f = quota, 
                               landings_f = g3_timeareadata('comm_landings', comm_landings[[1]] |>
-                                                                            mutate(area = as.numeric(area),
-                                                                                   step = as.numeric(step),
-                                                                                   year = as.numeric(year))),
+                                                             mutate(area = as.numeric(area),
+                                                                    step = as.numeric(step),
+                                                                    year = as.numeric(year))),
                               unit = 'biomass')) 
       
     }else{
@@ -136,11 +160,11 @@ fleet_actions <-
                             },
                             catchability_f = 
                               gadget3:::g3a_predate_catchability_project(
-                                quota_f = quota,
+                                quota_f = quotafunction(lln),
                                 landings_f = g3_timeareadata('lln_landings', lln_landings[[1]] |>
-                                                                              mutate(area = as.numeric(area),
-                                                                                     step = as.numeric(step),
-                                                                                     year = as.numeric(year))),
+                                                               mutate(area = as.numeric(area),
+                                                                      step = as.numeric(step),
+                                                                      year = as.numeric(year))),
                                 unit = 'biomass')),
         bmt |> 
           g3a_predate_fleet(stocks,
@@ -154,11 +178,11 @@ fleet_actions <-
                             },
                             catchability_f = 
                               gadget3:::g3a_predate_catchability_project(
-                                quota_f = quota,
+                                quota_f = quotafunction(bmt),
                                 landings_f = g3_timeareadata('bmt_landings', bmt_landings[[1]] |>
-                                                                              mutate(area = as.numeric(area),
-                                                                                     step = as.numeric(step),
-                                                                                     year = as.numeric(year))),
+                                                               mutate(area = as.numeric(area),
+                                                                      step = as.numeric(step),
+                                                                      year = as.numeric(year))),
                                 unit = 'biomass'))
       )
     },
@@ -176,15 +200,15 @@ fleet_actions <-
                             ## The foreign fleet will share the same longline suitability or, if single_fleet = TRUE, the commercial fleet 
                             gadget3::g3_suitability_exponentiall50(alpha = lln_par$alpha,
                                                                    l50 = lln_par$l50) 
-                            }
-                          },
+                          }
+                        },
                         catchability_f = 
                           gadget3:::g3a_predate_catchability_project(
-                            quota_f = quota,
+                            quota_f = quotafunction(foreign),
                             landings_f = g3_timeareadata('foreign_landings', foreign_landings[[1]] |>
-                                                                          mutate(area = as.numeric(area),
-                                                                                 step = as.numeric(step),
-                                                                                 year = as.numeric(year))),
+                                                           mutate(area = as.numeric(area),
+                                                                  step = as.numeric(step),
+                                                                  year = as.numeric(year))),
                             unit = 'biomass')),
     aut |> 
       g3a_predate_fleet(stocks,
@@ -198,7 +222,7 @@ fleet_actions <-
     
     list()
   )
-     
+
 if (bmt_age){
   fleet_actions <- 
     c(
@@ -217,6 +241,5 @@ if (bmt_age){
       list()
     )
 }
-    
-    
-    
+
+

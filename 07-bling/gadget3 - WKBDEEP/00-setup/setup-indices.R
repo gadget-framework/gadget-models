@@ -25,7 +25,7 @@ if (stratified_indices){
   
   si_var <- log(si_cv^2+1)
   
-  load(file = 'benchmarks/WKBDEEP/gadget3/data/survey_indices.Rdata')
+  load(file = 'data/survey_indices.Rdata')
   tmp <- 
     survey_indices |> 
     filter(index == 'Combined') |> 
