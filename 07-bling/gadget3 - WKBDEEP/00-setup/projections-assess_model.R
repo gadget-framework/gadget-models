@@ -39,13 +39,54 @@
 # Function is projects a stock forwards lag_steps, retrieves the biomass,
 # compares with a trigger, scales a target F, then computes the catch for the 
 # scaled target F based on Baranov
+
+g3_quota_assess_bl <- function (
+    predstocks,
+    preystocks,
+    assess_f,
+    unit = c("biomass-year", "biomass", "harvest-rate", "harvest-rate-year",
+             "individuals", "individuals-year") ) {
+  # Turn list of calls into a single list() call
+  to_list_call <- function (x) as.call(c(list(as.symbol("list")), x ))
+  unit <- match.arg(unit)
+  
+  pred_names <- vapply(predstocks, function (s) s$name, character(1))
+  prey_names <- vapply(preystocks, function (s) s$name, character(1))
+  
+  hist_cons <- to_list_call(sapply(pred_names, function (pred_n) {
+    to_list_call(sapply(prey_names, function (prey_n) {
+      as.symbol(paste0("detail_", prey_n, "_", pred_n, "__cons"))
+    }, simplify = FALSE))
+  }, simplify = FALSE))
+  hist_suits <- to_list_call(sapply(pred_names, function (pred_n) {
+    to_list_call(sapply(prey_names, function (prey_n) {
+      as.symbol(paste0("detail_", prey_n, "_", pred_n, "__suit"))
+    }, simplify = FALSE))
+  }, simplify = FALSE))
+  hist_abund <- to_list_call(sapply(prey_names, function (prey_n) {
+    as.symbol(paste0("dstart_", prey_n, "__num"))
+  }, simplify = FALSE))
+  hist_meanwgt <- to_list_call(sapply(prey_names, function (prey_n) {
+    as.symbol(paste0("dstart_", prey_n, "__wgt"))
+  }, simplify = FALSE))
+  
+  out <- f_substitute(assess_f, list(
+    cons = hist_cons,
+    suits = hist_suits,
+    abund = hist_abund,
+    meanwgt = hist_meanwgt ))
+  attr(out, "quota_name") <- c("assess", sapply(predstocks, function (ps) ps$name))
+  attr(out, "catchability_unit") <- unit
+  return(out)
+}
+
 assess_fn <- function (
   cur_year,
   steps_per_year,
   cons,
   abund,
   meanwgt,
-  #suits,
+  suits,
   M,
   btrigger,
   ftarget,
@@ -106,13 +147,13 @@ assess_fn <- function (
   # Scaled F
   Fapplied <- ftarget * scaler
   # F at age
+  # TODO: this should be F per age per fleet so that catch nums per fleet is computed
   F_at_age <- Fapplied * suit_at_age
   
   # Biomass quota from Baranov
   # Numbers aggregated across stocks 
   Z_at_age <- M + F_at_age
-  catch_num <- 
-    g3_array_combine(stock_N_imp) * F_at_age / pmax(Z_at_age, 1e-12) * (1 - exp(-Z_at_age))
+  catch_num <- g3_array_combine(stock_N_imp) * F_at_age / pmax(Z_at_age, 1e-12) * (1 - exp(-Z_at_age))
   
   # Assuming weight-at-age does not change during the lag, or should we use mean
   # weight-at-age of last n years?
