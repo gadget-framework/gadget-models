@@ -40,20 +40,37 @@ if (single_fleet) fleets <- list(comm, foreign) else fleets <- list(bmt, lln, fo
 ## ------------------------------------------------------------------------------
 
 quotafunction <- function(x){
-  gadget3::g3_quota(
-    gadget3::g3_quota_hockeyfleet(
+  g3_quota(
+    g3_quota_assess(
       predstocks = x,
       preystocks = list(mat_stock),
-      preyprop_fs = g3_suitability_blueling(),
-      btrigger = g3_parameterized('hf.btrigger', value = 1, optimise = FALSE, by_stock = mat_stock),
-      harvest_rate = gadget3:::f_substitute(~g3_param_table('project_hr',
-                                                            expand.grid(cur_year = seq(end_year+1, 
-                                                                                       end_year+py)), 
-                                                            ifmissing = 0,
-                                                            optimise = FALSE,
-                                                            value = 0),
-                                            list(py = defaults$project_years))
-    ),
+      function_f = g3_formula(
+        assess_fn(
+          cur_year,
+          cons,
+          abund,
+          meanwgt,
+          M = 0.15,#g3_parameterized('M', by_stock = stocks, by_age = TRUE)
+          btrigger = 1L,#g3_parameterized('bli.mat.hf.btrigger')
+          ftarget = g3_parameterized("F_target"),
+          trigger_stock = "bli_mat",
+          biomass_prop = 1L,
+          lag_steps = 2L
+        )
+      )
+    ),# gadget3::g3_quota_hockeyfleet(
+    #   predstocks = x,
+    #   preystocks = list(mat_stock),
+    #   preyprop_fs = g3_suitability_blueling(),
+    #   btrigger = g3_parameterized('hf.btrigger', value = 1, optimise = FALSE, by_stock = mat_stock),
+    #   harvest_rate = gadget3:::f_substitute(~g3_param_table('project_hr',
+    #                                                         expand.grid(cur_year = seq(end_year+1, 
+    #                                                                                    end_year+py)), 
+    #                                                         ifmissing = 0,
+    #                                                         optimise = FALSE,
+    #                                                         value = 0),
+    #                                         list(py = defaults$project_years))
+    # ),
     year_length = 1L,
     start_step = 4L,
     run_revstep = -3,
